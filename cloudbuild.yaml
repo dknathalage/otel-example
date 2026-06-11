@@ -1,0 +1,21 @@
+# Native amd64 build of the three app images, pushed to Artifact Registry.
+# Submit from repo root:
+#   gcloud builds submit --project focal-fossa-dev --config cloudbuild.yaml \
+#     --substitutions=_AR=us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc,_TAG=<sha> .
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: api
+    args: ["build", "-t", "${_AR}/api:${_TAG}", "-f", "src/Api/Dockerfile", "."]
+  - name: gcr.io/cloud-builders/docker
+    id: worker
+    args: ["build", "-t", "${_AR}/worker:${_TAG}", "-f", "src/Worker/Dockerfile", "."]
+  - name: gcr.io/cloud-builders/docker
+    id: web
+    args: ["build", "-t", "${_AR}/web:${_TAG}", "-f", "src/Web/Dockerfile", "src/Web"]
+images:
+  - "${_AR}/api:${_TAG}"
+  - "${_AR}/worker:${_TAG}"
+  - "${_AR}/web:${_TAG}"
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
