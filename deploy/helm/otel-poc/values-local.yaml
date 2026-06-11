@@ -2,6 +2,8 @@
 env: local
 deps:
   enabled: true
+collector:
+  debug: true
 image:
   registry: "otel-poc"
   tag: "dev"

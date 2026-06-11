@@ -27,12 +27,27 @@ spec:
           ports:
             - { name: otlp-grpc, containerPort: 4317 }
             - { name: otlp-http, containerPort: 4318 }
+          {{- if .Values.gcpAdcSecretName }}
+          env:
+            - { name: GOOGLE_APPLICATION_CREDENTIALS, value: "/var/run/adc/adc.json" }
+            - { name: GOOGLE_CLOUD_QUOTA_PROJECT, value: "{{ .Values.gcpProject }}" }
+          {{- end }}
           volumeMounts:
             - { name: config, mountPath: /conf }
+            {{- if .Values.gcpAdcSecretName }}
+            - { name: adc, mountPath: /var/run/adc, readOnly: true }
+            {{- end }}
       volumes:
         - name: config
           configMap:
             name: collector-config
+        {{- if .Values.gcpAdcSecretName }}
+        - name: adc
+          secret:
+            secretName: {{ .Values.gcpAdcSecretName }}
+            items:
+              - { key: adc.json, path: adc.json }
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service

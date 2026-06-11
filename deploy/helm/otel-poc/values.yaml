@@ -7,6 +7,11 @@ env: local
 # GCP project id. Rendered into the collector config (resource/gcp value + GSM URIs).
 gcpProject: ""
 
+# Name of a Secret (key: adc.json) holding Application Default Credentials for the
+# collector's googleclientauth extension. Used on kind where no metadata server
+# exists. Created out-of-band by the operator; the chart only mounts it. Empty = off.
+gcpAdcSecretName: ""
+
 # App container images. Match the local podman image names: otel-poc/api:dev etc.
 image:
   registry: "otel-poc"
@@ -17,6 +22,9 @@ image:
 # provider (used by the dash0/coralogix GSM secret refs).
 collector:
   image: "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.151.0"
+  # When true, add a debug exporter (verbosity: detailed) to every pipeline so the
+  # span tree is visible in collector logs regardless of backend.
+  debug: false
 
 # Per-provider settings.
 providers:

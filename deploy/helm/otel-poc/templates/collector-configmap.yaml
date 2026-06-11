@@ -34,6 +34,10 @@ data:
       {{- end }}
       {{- end }}
     exporters:
+      {{- if .Values.collector.debug }}
+      debug:
+        verbosity: detailed
+      {{- end }}
       {{- if eq .Values.provider "google" }}
       otlphttp/be:
         endpoint: https://telemetry.googleapis.com
@@ -61,12 +65,12 @@ data:
         traces:
           receivers: [otlp]
           processors: [batch{{ if eq .Values.provider "google" }}, resource/gcp{{ if eq .Values.env "gke" }}, resourcedetection/gcp{{ end }}{{ end }}]
-          exporters: [{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+          exporters: [{{ if .Values.collector.debug }}debug, {{ end }}{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
         metrics:
           receivers: [otlp]
           processors: [batch{{ if eq .Values.provider "google" }}, resource/gcp{{ if eq .Values.env "gke" }}, resourcedetection/gcp{{ end }}{{ end }}]
-          exporters: [{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+          exporters: [{{ if .Values.collector.debug }}debug, {{ end }}{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
         logs:
           receivers: [otlp]
           processors: [batch]
-          exporters: [{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+          exporters: [{{ if .Values.collector.debug }}debug, {{ end }}{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
