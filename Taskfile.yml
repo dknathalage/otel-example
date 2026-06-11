@@ -37,7 +37,7 @@ tasks:
     cmds:
       - docker build --platform linux/amd64 -t {{.REGISTRY}}/api:{{.TAG}} -f src/Api/Dockerfile .
       - docker build --platform linux/amd64 -t {{.REGISTRY}}/worker:{{.TAG}} -f src/Worker/Dockerfile .
-      - docker build --platform linux/amd64 -t {{.REGISTRY}}/web:{{.TAG}} -f src/Web/Dockerfile src/Web
+      - docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080 --build-arg NEXT_PUBLIC_OTLP_HTTP_URL=http://localhost:4318/v1/traces -t {{.REGISTRY}}/web:{{.TAG}} -f src/Web/Dockerfile src/Web
 
   push:
     desc: Push the built images to Artifact Registry
