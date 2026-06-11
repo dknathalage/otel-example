@@ -88,8 +88,8 @@ Distributed trace spanning browser → HTTP → cache → SQL → messaging → 
 
 ## Shared `core.*` packages
 
-A set of small, single-purpose **.NET class libraries** under `src/core/`,
-referenced by both `api` and `worker`. Each has one clear purpose, a narrow
+A set of small, single-purpose **.NET class libraries** under `dotnet/src/Core/`
+(see Source layout), referenced by both `api` and `worker`. Each has one clear purpose, a narrow
 public interface, and is independently testable. Business code depends on these,
 never on the SDKs directly.
 
@@ -97,7 +97,7 @@ never on the SDKs directly.
 |---------|---------|-------|
 | `Core.Secrets` | GSM-backed secret access. `ISecretProvider` → `GsmSecretProvider` over `Google.Cloud.SecretManager.V1`. Caches values. | WIF on GKE, ADC locally. Single auth path for all apps. |
 | `Core.Telemetry` | Shared `ActivitySource`, the W3C `TextMapPropagator`, resource-attribute conventions, helpers to start manual spans. | Used by `core.pubsub`/`core.firestore` for the manual spans the agent can't produce. |
-| `Core.Logging` | `ILogger` conventions + structured enrichment (order id, trace correlation scopes). | Agent exports these as OTLP logs automatically; this is config, not an exporter. |
+| `Core.Logging` | `ILogger` conventions + structured enrichment (order id, trace correlation scopes). Depends on `Core.Telemetry`. | Agent exports these as OTLP logs automatically; this is config, not an exporter. |
 | `Core.PubSub` | Publish/consume wrapper over `Google.Cloud.PubSub.V1`. **Injects `traceparent`/`tracestate` into message attributes on publish, extracts on consume**, emits producer/consumer spans. | THE home of the propagation shim. Depends on `Core.Telemetry`. |
 | `Core.Firestore` | Wrapper over `Google.Cloud.Firestore` with **manual client spans** + consistent attributes. | Firestore is not auto-instrumented. Depends on `Core.Telemetry`. |
 | `Core.Redis` | `StackExchange.Redis` connection mgmt + cache/idempotency helpers. | Auto-instrumented for traces; package is thin. |
@@ -111,6 +111,107 @@ services follow the same wiring.
 libraries. It mirrors the same *contracts* in a thin `web/lib/`: `lib/secrets.ts`
 (server-side GSM read, same secret names) and `lib/otel/` (browser bootstrap).
 Web touches no Pub/Sub/Firestore/Redis directly — it calls the API.
+
+## Source layout
+
+Monorepo. .NET solution (api + worker + core libs) under `dotnet/`; Next.js under
+`apps/web/`; infra/helm/load/docs alongside.
+
+```
+otel-example/
+├─ apps/
+│  └─ web/                          # Next.js (TypeScript, app router)
+│     ├─ package.json
+│     ├─ next.config.js
+│     ├─ instrumentation.ts         # @vercel/otel registerOTel() — server
+│     ├─ Dockerfile
+│     ├─ app/
+│     │  ├─ layout.tsx
+│     │  ├─ page.tsx                # order form
+│     │  └─ providers.tsx           # mounts browser OTel init
+│     └─ lib/
+│        ├─ otel/client.ts          # browser Web SDK bootstrap (OTLP/http)
+│        ├─ api.ts                  # typed calls to .NET API
+│        └─ secrets.ts              # server GSM read (mirrors Core.Secrets)
+│
+├─ dotnet/
+│  ├─ OtelPoc.sln
+│  ├─ Directory.Packages.props      # central NuGet versions
+│  ├─ src/
+│  │  ├─ Api/
+│  │  │  ├─ Api.csproj
+│  │  │  ├─ Program.cs              # DI: AddCore*(); maps endpoints
+│  │  │  ├─ Endpoints/OrdersEndpoints.cs
+│  │  │  ├─ Models/{Order,CreateOrderRequest}.cs
+│  │  │  ├─ appsettings.json
+│  │  │  └─ Dockerfile              # multi-stage + otel-dotnet-auto-install.sh
+│  │  ├─ Worker/
+│  │  │  ├─ Worker.csproj
+│  │  │  ├─ Program.cs
+│  │  │  ├─ Consumers/OrderConsumer.cs   # Core.PubSub subscribe → Core.Firestore
+│  │  │  ├─ appsettings.json
+│  │  │  └─ Dockerfile
+│  │  └─ Core/
+│  │     ├─ Core.Secrets/      { ISecretProvider, GsmSecretProvider, ServiceCollectionExtensions }
+│  │     ├─ Core.Telemetry/    { Telemetry(ActivitySource), Propagation, ResourceConventions, …Extensions }
+│  │     ├─ Core.Logging/      { LoggingConventions, …Extensions }            # → Core.Telemetry
+│  │     ├─ Core.PubSub/       { IPubSubPublisher, PubSubPublisher,           # → Core.Telemetry
+│  │     │                       IPubSubSubscriber, PubSubSubscriber,
+│  │     │                       TraceContextCarrier, …Extensions }          # inject/extract shim
+│  │     ├─ Core.Firestore/    { IFirestoreStore, FirestoreStore, …Extensions }  # → Core.Telemetry, manual spans
+│  │     ├─ Core.Redis/        { IRedisCache, RedisCache(idempotency), …Extensions }
+│  │     └─ Core.Data/         { OrdersDbContext, OrderEntity, IOrderRepository,
+│  │                             OrderRepository, Migrations/, …Extensions }
+│  └─ tests/
+│     ├─ Core.PubSub.Tests/         # traceparent survives publish→consume
+│     ├─ Core.Firestore.Tests/      # span emission
+│     └─ Pipeline.IntegrationTests/ # end-to-end span tree (testcontainers/emulators)
+│
+├─ deploy/helm/otel-poc/
+│  ├─ Chart.yaml
+│  ├─ values.yaml                   # provider, env, gcpProject, providers.*, deps
+│  ├─ values-local.yaml             # env=local, deps.enabled=true
+│  ├─ values-gke.yaml               # env=gke, image registry, WIF
+│  └─ templates/
+│     ├─ _helpers.tpl               # release-derived names (topic/db/prefix/KSA)
+│     ├─ namespace.yaml
+│     ├─ serviceaccount.yaml        # KSA + WIF annotation
+│     ├─ web.yaml  api.yaml  worker.yaml          # Deployment+Service each
+│     ├─ collector-configmap.yaml   # provider-selected exporter + pipelines
+│     ├─ collector.yaml             # Deployment+Service
+│     ├─ ingress.yaml               # app hosts + browser-OTLP host (CORS)
+│     └─ deps/                      # rendered only when env=local
+│        ├─ postgres.yaml  redis.yaml
+│        └─ pubsub-emulator.yaml  firestore-emulator.yaml
+│
+├─ infra/
+│  ├─ modules/
+│  │  ├─ local-kind/                # kind cluster
+│  │  └─ gke/                       # cluster, AR, WIF, GSM secrets,
+│  │                                #   shared managed deps + per-release logical objects
+│  └─ live/
+│     ├─ terragrunt.hcl             # root: state, provider, shared inputs
+│     ├─ local/terragrunt.hcl
+│     └─ gke/terragrunt.hcl
+│
+├─ load/                            # k6 scenarios (run per namespace)
+│  └─ order-scenario.js
+├─ Taskfile.yml                     # build, kind-load, install-google/dash0/coralogix
+└─ docs/
+   └─ comparison/                   # the deliverable matrix + screenshots
+```
+
+**Per-app wiring (the contract every app follows):**
+
+- `Api/Program.cs`: `builder.Services.AddCoreSecrets().AddCoreTelemetry()
+  .AddCoreLogging().AddCoreData().AddCoreRedis().AddCorePubSub();` then maps
+  `OrdersEndpoints`. Endpoint handler: `repo.Save(order)` → `cache.Idempotent(...)`
+  → `publisher.Publish("OrderCreated", order)`. No SDK calls in the handler.
+- `Worker/Program.cs`: same `AddCore*` set (minus `AddCoreData` if the worker
+  only reads Firestore) + `AddCoreFirestore`; registers `OrderConsumer` which
+  `subscriber.Subscribe(...)` → `store.Upsert(...)`.
+- `web`: `instrumentation.ts` (server) + `lib/otel/client.ts` (browser); calls
+  the API via `lib/api.ts`; reads any server secret via `lib/secrets.ts`.
 
 ## Auto-instrumentation details (verified)
 
@@ -187,31 +288,38 @@ by `core.*`).
         authenticator: googleclientauth
   ```
 
-  **dash0:**
+  **dash0** (`{{ .Values.gcpProject }}` / `.dataset` rendered by Helm at template
+  time — no nested confmap expansion):
   ```yaml
   exporters:
     otlphttp/dash0:
-      endpoint: https://ingress.<region>.aws.dash0.com   # base, no /v1 path
+      endpoint: https://ingress.{{ .Values.providers.dash0.region }}.aws.dash0.com
       headers:
-        Authorization: "Bearer ${googlesecretmanager:projects/${env:GCP_PROJECT}/secrets/dash0-token/versions/latest}"
-        Dash0-Dataset: "otel-poc"
+        Authorization: "Bearer ${googlesecretmanager:projects/{{ .Values.gcpProject }}/secrets/dash0-token/versions/latest}"
+        Dash0-Dataset: "{{ .Values.providers.dash0.dataset }}"
   ```
 
   **coralogix** (dedicated exporter, one block serves all 3 signals):
   ```yaml
   exporters:
     coralogix:
-      domain: "<region>.coralogix.com"          # e.g. eu2.coralogix.com
-      private_key: "${googlesecretmanager:projects/${env:GCP_PROJECT}/secrets/coralogix-key/versions/latest}"
+      domain: "{{ .Values.providers.coralogix.domain }}"   # e.g. eu2.coralogix.com
+      private_key: "${googlesecretmanager:projects/{{ .Values.gcpProject }}/secrets/coralogix-key/versions/latest}"
       application_name: "otel-poc"
       subsystem_name: "${env:OTEL_SERVICE_NAME}"
   ```
 
 - **Pipelines:** traces, metrics, logs — each wired to the single selected
-  exporter.
+  exporter. The `resource/gcp` and `resourcedetection/gcp` processors are
+  included in the processor list **only when** `provider=google` (and, for
+  detection, `env=gke`) — the ConfigMap template gates them so the dash0/coralogix
+  pipelines never reference an undefined processor.
 - **GSM provider syntax (verified):**
   `${googlesecretmanager:projects/PROJECT/secrets/NAME/versions/latest}` — the
-  `/versions/<n|latest>` segment is required.
+  `/versions/<n|latest>` segment is required. **PROJECT is rendered by Helm at
+  template time** (`{{ .Values.gcpProject }}`), not nested as `${env:...}` inside
+  the confmap expression (nested expansion is unreliable across collector
+  versions).
 
 ### Dash0 browser caveat (verified risk)
 
@@ -239,11 +347,27 @@ infra/
   in-namespace deps: Postgres, Redis, **Pub/Sub emulator**, **Firestore
   emulator** containers. Fully offline except GSM (real, via ADC).
 - **gke:** Tofu provisions GKE, Artifact Registry, Workload Identity, GSM
-  secrets, and the managed data services. To bound cost, the managed instances
-  (Cloud SQL, Memorystore, Firestore) are **shared** across the three releases,
-  but each release gets **logical isolation**: its own Pub/Sub topic+subscription,
-  its own Postgres database/schema, and a namespaced Firestore collection prefix
-  (all derived from the release name via Helm values).
+  secrets, and the managed data services. To bound cost, the managed **instances**
+  (Cloud SQL, Memorystore, Firestore) are **shared** across the three releases.
+  **Tofu also creates the per-release logical objects** on those shared instances
+  by looping over the release list `[google, dash0, coralogix]`:
+  - **Pub/Sub:** one topic + subscription per release — `orders-<release>` /
+    `orders-<release>-sub`.
+  - **Postgres:** one database per release — `orders_<release>`.
+  - **Firestore:** one collection prefix per release — `<release>/...`.
+  - **Redis (Memorystore):** one key prefix per release — `<release>:` (prevents
+    idempotency-key collisions when the same k6 scenario runs against multiple
+    releases).
+
+  **Naming convention** = `<logical>-<release>` (or `_`/`:` per store), defined
+  once and consumed by **both** sides: Tofu creates the objects, Helm references
+  them by the same convention via `.Release.Name`. Helm does **not** provision GCP
+  objects — it only names/consumes them.
+- **Local vs GKE asymmetry (comparison caveat):** local gives each namespace its
+  **own** emulator containers (full isolation); GKE **shares** instances with
+  logical isolation. On GKE, shared Cloud SQL/Memorystore mean cross-release
+  contention that doesn't exist locally — stagger per-provider load runs (or note
+  the contention) so ingest-lag/latency numbers stay fair.
 - **Terragrunt** keeps inputs DRY across envs.
 
 ### Image build & distribution
@@ -312,6 +436,12 @@ with a different `provider` value; nothing else changes.
 - Tofu provisions GSM secrets (`dash0-token`, `coralogix-key`, DB creds), the GCP
   service account, the WIF binding, and IAM
   `roles/secretmanager.secretAccessor`.
+- **WIF naming contract:** the binding member is
+  `serviceAccount:PROJECT.svc.id.goog[otel-poc-<release>/otel-poc]` — Tofu
+  forward-references the K8s namespace (`otel-poc-<release>`) and KSA name
+  (`otel-poc`) that Helm creates later. GCP IAM allows binding a not-yet-created
+  principal, so Tofu-before-Helm ordering is fine; both sides derive the names
+  from the same `<release>` convention to avoid drift.
 - **Apps (`Core.Secrets`):** GSM client at startup — WIF on GKE, ADC locally.
 - **Collector:** `googlesecretmanager` confmap provider, same auth path, with the
   `/versions/latest` syntax.
