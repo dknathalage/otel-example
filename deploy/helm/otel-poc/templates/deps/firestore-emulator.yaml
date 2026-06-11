@@ -1,0 +1,46 @@
+{{- if .Values.deps.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firestore-emulator
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: firestore-emulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: firestore-emulator
+  template:
+    metadata:
+      labels:
+        {{- include "otel-poc.labels" . | nindent 8 }}
+        app.kubernetes.io/name: firestore-emulator
+    spec:
+      containers:
+        - name: firestore-emulator
+          image: gcr.io/google.com/cloudsdktool/google-cloud-cli
+          command: ["gcloud"]
+          args:
+            - "beta"
+            - "emulators"
+            - "firestore"
+            - "start"
+            - "--host-port=0.0.0.0:8080"
+            - "--project={{ .Values.gcpProject }}"
+          ports:
+            - { name: firestore, containerPort: 8080 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: firestore-emulator
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: firestore-emulator
+spec:
+  selector:
+    app.kubernetes.io/name: firestore-emulator
+  ports:
+    - { name: firestore, port: 8080, targetPort: 8080 }
+{{- end }}

@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker
+  template:
+    metadata:
+      labels:
+        {{- include "otel-poc.labels" . | nindent 8 }}
+        app.kubernetes.io/name: worker
+    spec:
+      serviceAccountName: otel-poc
+      containers:
+        - name: worker
+          image: "{{ .Values.image.registry }}/worker:{{ .Values.image.tag }}"
+          env:
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-poc.otlpEndpoint" . }}" }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-poc.resourceAttributes" . }}" }
+            - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
+            - { name: PubSub__ProjectId, value: "{{ .Values.gcpProject }}" }
+            - { name: PubSub__TopicId, value: "{{ include "otel-poc.topic" . }}" }
+            - { name: PubSub__SubscriptionId, value: "{{ include "otel-poc.subscription" . }}" }
+            - { name: Firestore__ProjectId, value: "{{ .Values.gcpProject }}" }
+            - { name: Firestore__CollectionPrefix, value: "{{ include "otel-poc.prefix" . }}" }
+            {{- if .Values.deps.enabled }}
+            - { name: PUBSUB_EMULATOR_HOST, value: "pubsub-emulator:8085" }
+            - { name: FIRESTORE_EMULATOR_HOST, value: "firestore-emulator:8080" }
+            {{- end }}

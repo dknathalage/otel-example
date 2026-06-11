@@ -1,0 +1,14 @@
+# Local (kind) overrides.
+env: local
+deps:
+  enabled: true
+image:
+  registry: "otel-poc"
+  tag: "dev"
+webOrigin: "http://localhost:3000"
+ingress:
+  enabled: true
+  host: "localhost"
+web:
+  apiUrl: "http://localhost/api"
+  otlpHttpUrl: "http://localhost/otlp/v1/traces"

@@ -1,0 +1,19 @@
+# GKE overrides. Managed cloud deps (Cloud SQL / Memorystore / Pub-Sub / Firestore),
+# so the in-namespace emulators are disabled.
+env: gke
+deps:
+  enabled: false
+# Override registry to the Artifact Registry path at install time, e.g.
+#   --set image.registry=us-docker.pkg.dev/<project>/<repo>
+image:
+  registry: "us-docker.pkg.dev/REPLACE_ME/otel-poc"
+  tag: "dev"
+# WIF: GCP service account email bound to the KSA. Override at install time.
+gcpServiceAccount: "otel-poc@REPLACE_ME.iam.gserviceaccount.com"
+webOrigin: "https://web.example.com"
+ingress:
+  enabled: true
+  host: "example.com"
+web:
+  apiUrl: "https://api.example.com"
+  otlpHttpUrl: "https://otlp.example.com/v1/traces"

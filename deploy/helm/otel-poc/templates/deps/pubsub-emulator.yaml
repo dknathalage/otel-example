@@ -1,0 +1,46 @@
+{{- if .Values.deps.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pubsub-emulator
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: pubsub-emulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pubsub-emulator
+  template:
+    metadata:
+      labels:
+        {{- include "otel-poc.labels" . | nindent 8 }}
+        app.kubernetes.io/name: pubsub-emulator
+    spec:
+      containers:
+        - name: pubsub-emulator
+          image: gcr.io/google.com/cloudsdktool/google-cloud-cli
+          command: ["gcloud"]
+          args:
+            - "beta"
+            - "emulators"
+            - "pubsub"
+            - "start"
+            - "--host-port=0.0.0.0:8085"
+            - "--project={{ .Values.gcpProject }}"
+          ports:
+            - { name: pubsub, containerPort: 8085 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pubsub-emulator
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: pubsub-emulator
+spec:
+  selector:
+    app.kubernetes.io/name: pubsub-emulator
+  ports:
+    - { name: pubsub, port: 8085, targetPort: 8085 }
+{{- end }}

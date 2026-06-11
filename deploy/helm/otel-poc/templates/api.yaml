@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  template:
+    metadata:
+      labels:
+        {{- include "otel-poc.labels" . | nindent 8 }}
+        app.kubernetes.io/name: api
+    spec:
+      serviceAccountName: otel-poc
+      containers:
+        - name: api
+          image: "{{ .Values.image.registry }}/api:{{ .Values.image.tag }}"
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-poc.otlpEndpoint" . }}" }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-poc.resourceAttributes" . }}" }
+            - { name: ASPNETCORE_URLS, value: "http://0.0.0.0:8080" }
+            - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
+            - { name: ConnectionStrings__Orders, value: "Host=postgres;Port=5432;Database={{ include "otel-poc.pgdb" . }};Username=postgres;Password=postgres" }
+            - { name: Redis__ConnectionString, value: "redis:6379" }
+            - { name: Redis__KeyPrefix, value: "{{ include "otel-poc.prefix" . }}" }
+            - { name: PubSub__ProjectId, value: "{{ .Values.gcpProject }}" }
+            - { name: PubSub__TopicId, value: "{{ include "otel-poc.topic" . }}" }
+            - { name: PubSub__SubscriptionId, value: "{{ include "otel-poc.subscription" . }}" }
+            {{- if .Values.deps.enabled }}
+            - { name: PUBSUB_EMULATOR_HOST, value: "pubsub-emulator:8085" }
+            - { name: FIRESTORE_EMULATOR_HOST, value: "firestore-emulator:8080" }
+            {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: api
+spec:
+  selector:
+    app.kubernetes.io/name: api
+  ports:
+    - { name: http, port: 80, targetPort: 8080 }

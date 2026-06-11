@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        {{- include "otel-poc.labels" . | nindent 8 }}
+        app.kubernetes.io/name: web
+    spec:
+      serviceAccountName: otel-poc
+      containers:
+        - name: web
+          image: "{{ .Values.image.registry }}/web:{{ .Values.image.tag }}"
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-poc.otlpEndpoint" . }}" }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-poc.resourceAttributes" . }}" }
+            - { name: NEXT_PUBLIC_API_URL, value: "{{ .Values.web.apiUrl }}" }
+            - { name: NEXT_PUBLIC_OTLP_HTTP_URL, value: "{{ .Values.web.otlpHttpUrl }}" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+    app.kubernetes.io/name: web
+spec:
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - { name: http, port: 80, targetPort: 3000 }

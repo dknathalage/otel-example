@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-config
+  labels:
+    {{- include "otel-poc.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    extensions:
+      {{- if eq .Values.provider "google" }}
+      googleclientauth: {}
+      {{- end }}
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+            cors:
+              allowed_origins: ["{{ .Values.webOrigin }}"]
+              allowed_headers: ["*"]
+    processors:
+      batch: {}
+      {{- if eq .Values.provider "google" }}
+      resource/gcp:
+        attributes:
+          - { key: gcp.project_id, value: "{{ .Values.gcpProject }}", action: upsert }
+      {{- if eq .Values.env "gke" }}
+      resourcedetection/gcp:
+        detectors: [env, gcp]
+        timeout: 2s
+        override: false
+      {{- end }}
+      {{- end }}
+    exporters:
+      {{- if eq .Values.provider "google" }}
+      otlphttp/be:
+        endpoint: https://telemetry.googleapis.com
+        encoding: proto
+        auth:
+          authenticator: googleclientauth
+      {{- else if eq .Values.provider "dash0" }}
+      otlphttp/be:
+        endpoint: https://ingress.{{ .Values.providers.dash0.region }}.aws.dash0.com
+        headers:
+          Authorization: "Bearer ${googlesecretmanager:projects/{{ .Values.gcpProject }}/secrets/dash0-token/versions/latest}"
+          Dash0-Dataset: "{{ .Values.providers.dash0.dataset }}"
+      {{- else if eq .Values.provider "coralogix" }}
+      coralogix:
+        domain: "{{ .Values.providers.coralogix.domain }}"
+        private_key: "${googlesecretmanager:projects/{{ .Values.gcpProject }}/secrets/coralogix-key/versions/latest}"
+        application_name: "otel-poc"
+        subsystem_name: "${env:HOSTNAME}"
+      {{- end }}
+    service:
+      {{- if eq .Values.provider "google" }}
+      extensions: [googleclientauth]
+      {{- end }}
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch{{ if eq .Values.provider "google" }}, resource/gcp{{ if eq .Values.env "gke" }}, resourcedetection/gcp{{ end }}{{ end }}]
+          exporters: [{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+        metrics:
+          receivers: [otlp]
+          processors: [batch{{ if eq .Values.provider "google" }}, resource/gcp{{ if eq .Values.env "gke" }}, resourcedetection/gcp{{ end }}{{ end }}]
+          exporters: [{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
