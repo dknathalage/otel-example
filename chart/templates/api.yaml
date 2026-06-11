@@ -25,6 +25,16 @@ spec:
           image: "{{ include "otel-stack.image" (dict "comp" $c "root" .) }}"
           ports:
             - { name: http, containerPort: 8080 }
+          # /healthz returns 200; the readiness probe also drives the GKE NEG L7 health
+          # check (default GET / returns 404 here and would wedge the rollout).
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
           env:
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
             - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf" }

@@ -25,6 +25,10 @@ spec:
           image: "{{ include "otel-stack.image" (dict "comp" $c "root" .) }}"
           ports:
             - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
           env:
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
             - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf" }
