@@ -25,6 +25,7 @@ spec:
           image: "{{ include "otel-stack.image" (dict "comp" $c "root" .) }}"
           env:
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf" }
             - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-stack.resourceAttributes" . }}" }
             # Register Core.Telemetry's ActivitySource so manual spans + the Pub/Sub
             # traceparent linkage are exported by the auto-instr agent.

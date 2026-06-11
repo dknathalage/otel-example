@@ -27,6 +27,7 @@ spec:
             - { name: http, containerPort: 8080 }
           env:
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf" }
             - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-stack.resourceAttributes" . }}" }
             # Register the Core.Telemetry ActivitySource so the auto-instr agent exports our
             # manual spans (orders publish/process, firestore upsert) and the Pub/Sub
