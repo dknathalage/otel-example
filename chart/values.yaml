@@ -57,11 +57,9 @@ components:
     apiUrl: "https://api.example.com"
     otlpHttpUrl: "https://otlp.example.com/v1/traces"
 
-# ── Ingress / browser ──
-ingress:
-  enabled: true
-  className: ""
-  host: example.com
+# ── Browser CORS ──
+# No Ingress: services are reached via `kubectl port-forward` only (not publicly exposed).
+# webOrigin is still used for the collector's OTLP/HTTP CORS allow-list.
 webOrigin: "https://web.example.com"
 
 # ── Workload Identity ──
