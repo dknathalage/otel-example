@@ -50,7 +50,14 @@ export function initBrowserOtel(): void {
   registerInstrumentations({
     instrumentations: [
       new DocumentLoadInstrumentation(),
-      new FetchInstrumentation(),
+      // Propagate W3C traceparent onto the cross-origin fetch to the API so the
+      // browser span and the API/worker spans join ONE trace. Without
+      // propagateTraceHeaderCorsUrls the header is dropped on cross-origin calls.
+      // The API allows the header via CORS (AllowAnyHeader for the web origin).
+      new FetchInstrumentation({
+        propagateTraceHeaderCorsUrls: [/.*/],
+        clearTimingResources: true,
+      }),
       new UserInteractionInstrumentation(),
     ],
   });
