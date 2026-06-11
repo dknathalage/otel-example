@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Core.Data/Core.Data.csproj" />
+    <Project Path="src/Core.Firestore/Core.Firestore.csproj" />
     <Project Path="src/Core.Logging/Core.Logging.csproj" />
     <Project Path="src/Core.PubSub/Core.PubSub.csproj" />
     <Project Path="src/Core.Redis/Core.Redis.csproj" />
