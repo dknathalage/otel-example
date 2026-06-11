@@ -103,13 +103,9 @@ tasks:
       PROVIDER: '{{.PROVIDER | default "google"}}'
       NS: '{{.APP_NAME}}-{{.PROVIDER}}'
     cmds:
-      - |
-        trap 'kill 0' EXIT INT TERM
-        kubectl port-forward -n {{.NS}} svc/web 3000:80 &
-        kubectl port-forward -n {{.NS}} svc/api 8080:80 &
-        kubectl port-forward -n {{.NS}} svc/collector 4318:4318 4317:4317 &
-        echo "web=http://localhost:3000  api=http://localhost:8080  collector otlp-http=4318 otlp-grpc=4317  (Ctrl-C to stop)"
-        wait
+      # Run in a real /bin/sh (go-task's embedded shell only supports `trap ... EXIT`,
+      # not signal names) so Ctrl-C tears down all three forwards via the process group.
+      - sh -c 'trap "kill 0" EXIT INT TERM; kubectl port-forward -n {{.NS}} svc/web 3000:80 & kubectl port-forward -n {{.NS}} svc/api 8080:80 & kubectl port-forward -n {{.NS}} svc/collector 4318:4318 4317:4317 & echo "web=http://localhost:3000  api=http://localhost:8080  collector otlp-http=4318 otlp-grpc=4317  (Ctrl-C to stop)"; wait'
 
   pf:web:
     desc: Port-forward only the web UI (localhost:3000) for one release (PROVIDER=google)
