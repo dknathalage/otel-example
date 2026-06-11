@@ -1,7 +1,7 @@
-# Runtime-only image. Published on the HOST into ./publish/worker before building
-# (see src/Api/Dockerfile for the rationale — avoids qemu/.NET MSBuild crash).
-#   host: dotnet publish src/Worker -c Release -o ./publish/worker
-#   build: podman build --platform linux/amd64 -f src/Worker/Dockerfile .   (context = repo root)
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet publish src/Worker -c Release -o /app
 FROM mcr.microsoft.com/dotnet/runtime:10.0
 WORKDIR /app
 RUN apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*
@@ -15,5 +15,5 @@ ENV CORECLR_ENABLE_PROFILING=1 \
     DOTNET_SHARED_STORE=/otel-dotnet-auto/store \
     DOTNET_STARTUP_HOOKS=/otel-dotnet-auto/net/OpenTelemetry.AutoInstrumentation.StartupHook.dll \
     OTEL_SERVICE_NAME=worker
-COPY publish/worker .
+COPY --from=build /app .
 ENTRYPOINT ["dotnet", "Worker.dll"]

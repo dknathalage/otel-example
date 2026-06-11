@@ -1,14 +1,15 @@
 version: "3"
 # Build + deploy the OTel multi-backend POC to GKE.
 #
-#   task ship PROVIDER=google     # publish + build amd64 + push + helm install (one backend)
-#   task build                    # host-publish .NET + build all 3 amd64 images
+#   task ship PROVIDER=google     # build amd64 + push + helm install (one backend)
+#   task build                    # build all 3 amd64 images
 #   task push                     # push images to Artifact Registry
 #   task install PROVIDER=dash0   # helm upgrade --install one backend stack
 #
-# Images are built linux/amd64 (GKE nodes are amd64). The .NET apps are published on the
-# HOST (native) and the Dockerfiles only COPY the output — this avoids the qemu/.NET
-# MSBuild crash when cross-building on an arm64 Mac. Requires a running podman machine.
+# Images are built linux/amd64 (GKE nodes are amd64) via Docker Desktop + Rosetta x86
+# emulation, which (unlike qemu) does not crash .NET's MSBuild when cross-building on an
+# arm64 Mac. The .NET apps publish INSIDE the image (proper multi-stage build). Requires
+# a running Docker Desktop with Rosetta amd64 emulation enabled.
 vars:
   TAG: { sh: git rev-parse --short HEAD }
   REGISTRY: '{{.REGISTRY | default "us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc"}}'
@@ -20,33 +21,26 @@ vars:
   REDIS_HOST: '{{.REDIS_HOST | default "10.104.117.155"}}'
 
 tasks:
-  publish:
-    desc: Host-publish the .NET apps (native, portable IL) into ./publish
-    cmds:
-      - dotnet publish src/Api -c Release -o ./publish/api
-      - dotnet publish src/Worker -c Release -o ./publish/worker
-
   login:
-    desc: Log podman into Artifact Registry via gcloud token
+    desc: Log docker into Artifact Registry via gcloud token
     cmds:
-      - gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin {{.REGISTRY | splitList "/" | first}}
+      - gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin {{.REGISTRY | splitList "/" | first}}
 
   images:
-    desc: Build all three linux/amd64 images (host-publishes .NET first)
-    deps: [publish]
+    desc: Build all three linux/amd64 images (multi-stage, publishes .NET inside the image)
     cmds:
-      - podman build --platform linux/amd64 -t {{.REGISTRY}}/api:{{.TAG}} -f src/Api/Dockerfile .
-      - podman build --platform linux/amd64 -t {{.REGISTRY}}/worker:{{.TAG}} -f src/Worker/Dockerfile .
-      - podman build --platform linux/amd64 -t {{.REGISTRY}}/web:{{.TAG}} -f src/Web/Dockerfile src/Web
+      - docker build --platform linux/amd64 -t {{.REGISTRY}}/api:{{.TAG}} -f src/Api/Dockerfile .
+      - docker build --platform linux/amd64 -t {{.REGISTRY}}/worker:{{.TAG}} -f src/Worker/Dockerfile .
+      - docker build --platform linux/amd64 -t {{.REGISTRY}}/web:{{.TAG}} -f src/Web/Dockerfile src/Web
 
   push:
     desc: Push the built images to Artifact Registry
     cmds:
       - for: [api, worker, web]
-        cmd: podman push {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
+        cmd: docker push {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
 
   build:
-    desc: Publish + build all images (no push)
+    desc: Build all images (no push)
     deps: [images]
 
   creds:gke:
