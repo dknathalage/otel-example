@@ -7,8 +7,6 @@ terraform {
 }
 
 inputs = {
-  project = "focal-fossa-dev"
-  region  = "us-central1"
-
-  cluster_name = "otel-poc"
+  project = get_env("GCP_PROJECT")
+  region  = get_env("GCP_REGION", "us-central1")
 }

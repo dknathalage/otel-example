@@ -18,6 +18,8 @@ remote_state {
 }
 
 # Shared inputs available to every environment.
+# APP_NAME is the single base-name knob; foundation and autopilot derive every
+# resource/cluster/KSA name from it. Defaults to "otel-poc" when unset.
 inputs = {
-  cluster_name = "otel-poc"
+  name = get_env("APP_NAME", "otel-poc")
 }

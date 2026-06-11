@@ -9,9 +9,16 @@ variable "region" {
   default     = "us-central1"
 }
 
+variable "name" {
+  type        = string
+  description = "Base name for all resources (Artifact Registry repo, GSA, Cloud SQL, Redis, and the default cluster/KSA names). Override individual names below if needed."
+  default     = "otel-poc"
+}
+
 variable "cluster_name" {
-  type    = string
-  default = "otel-poc"
+  type        = string
+  description = "GKE cluster name. Empty => derive from var.name."
+  default     = ""
 }
 
 variable "releases" {
@@ -22,14 +29,14 @@ variable "releases" {
 
 variable "ksa_namespace_prefix" {
   type        = string
-  description = "Namespace prefix each release deploys into (otel-poc-<release>)"
-  default     = "otel-poc"
+  description = "Namespace prefix each release deploys into (<prefix>-<release>). Empty => derive from var.name."
+  default     = ""
 }
 
 variable "ksa_name" {
   type        = string
-  description = "Kubernetes ServiceAccount name the workloads run as (created by Helm)"
-  default     = "otel-poc"
+  description = "Kubernetes ServiceAccount name the workloads run as (created by Helm). Empty => derive from var.name."
+  default     = ""
 }
 
 variable "create_firestore" {

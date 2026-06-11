@@ -1,7 +1,15 @@
-{{/* Release-derived short backend key (strips the otel-poc- prefix, or nameOverride). */}}
+{{/* Release-derived short backend key (strips the <appName>- prefix, or nameOverride). */}}
 {{- define "otel-stack.release" -}}
-{{- $p := .Values.nameOverride | default "otel-poc" -}}
+{{- $p := .Values.nameOverride | default .Values.appName -}}
 {{- .Release.Name | trimPrefix (printf "%s-" $p) -}}
+{{- end -}}
+
+{{/* Kubernetes ServiceAccount name. Defaults to appName; MUST equal the tofu ksa_name. */}}
+{{- define "otel-stack.serviceAccountName" -}}{{ .Values.serviceAccountName | default .Values.appName }}{{- end -}}
+
+{{/* GSA email for the Workload Identity annotation: explicit value, else <ksa>@<project>.iam… */}}
+{{- define "otel-stack.gcpServiceAccount" -}}
+{{- .Values.gcpServiceAccount | default (printf "%s@%s.iam.gserviceaccount.com" (include "otel-stack.serviceAccountName" .) .Values.gcpProject) -}}
 {{- end -}}
 
 {{/* Target namespace: explicit value, else the release namespace. */}}
@@ -21,7 +29,7 @@
 {{- define "otel-stack.otlpEndpoint" -}}http://collector:4318{{- end -}}
 
 {{/* Standard resource attributes for the auto-instrumentation agents. */}}
-{{- define "otel-stack.resourceAttributes" -}}service.namespace=otel-poc,deployment.environment={{ include "otel-stack.release" . }}{{- end -}}
+{{- define "otel-stack.resourceAttributes" -}}service.namespace={{ .Values.appName }},deployment.environment={{ include "otel-stack.release" . }}{{- end -}}
 
 {{/*
 Component image reference: <registry>/<repo>:<tag>.
@@ -44,7 +52,7 @@ ${googlesecretmanager:projects/{{ .root.Values.gcpProject }}/secrets/{{ .name }}
 
 {{/* Common labels. */}}
 {{- define "otel-stack.labels" -}}
-app.kubernetes.io/part-of: otel-poc
+app.kubernetes.io/part-of: {{ .Values.appName }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 otel-stack.io/release: {{ include "otel-stack.release" . }}
 otel-stack.io/backend: {{ .Values.backend.type }}

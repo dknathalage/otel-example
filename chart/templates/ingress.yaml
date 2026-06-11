@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: otel-poc
+  name: {{ .Values.appName }}
   namespace: {{ include "otel-stack.namespace" . }}
   labels:
     {{- include "otel-stack.labels" . | nindent 4 }}

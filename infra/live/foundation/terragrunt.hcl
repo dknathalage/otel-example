@@ -7,11 +7,10 @@ terraform {
 }
 
 inputs = {
-  project = "focal-fossa-dev"
-  region  = "us-central1"
+  project = get_env("GCP_PROJECT")
+  region  = get_env("GCP_REGION", "us-central1")
 
-  cluster_name = "otel-poc"
-  releases     = ["google", "dash0", "coralogix"]
+  releases = ["google", "dash0", "coralogix"]
 
   # Set false if the project already has a (default) Firestore database.
   create_firestore = true

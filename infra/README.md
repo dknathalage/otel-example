@@ -11,6 +11,19 @@ OpenTofu + Terragrunt for the OTel multi-backend POC. State is local (POC).
 - `live/foundation` — applies `gcp-foundation`.
 - `live/autopilot` — applies `gcp-autopilot`. Optional.
 
+## Configuration
+
+Project and region come from the environment (and `APP_NAME` for the base
+resource name); there are no hardcoded project defaults:
+
+```sh
+export GCP_PROJECT=my-project
+export GCP_REGION=us-central1     # optional, defaults to us-central1
+# export APP_NAME=otel-poc        # optional base name for all resources
+```
+
+`get_env("GCP_PROJECT")` has no default, so terragrunt fails fast if it is unset.
+
 ## Apply order
 
 1. **Always** apply the foundation:
@@ -33,15 +46,14 @@ OpenTofu + Terragrunt for the OTel multi-backend POC. State is local (POC).
      ```
 
    - **Use an existing cluster** — skip `live/autopilot` entirely and point your
-     kubeconfig at the pre-provisioned cluster:
+     kubeconfig at the pre-provisioned cluster (`CLUSTER` defaults to `$APP_NAME`):
 
      ```sh
-     task creds:gke CLUSTER=<existing-cluster> REGION=<region> PROJECT=<project>
+     task creds:gke CLUSTER=<existing-cluster>
      ```
 
-     Defaults: `CLUSTER=otel-poc REGION=us-central1 PROJECT=focal-fossa-dev`.
-
-3. **Deploy the app** with Helm, once per provider release:
+3. **Deploy the app** with Helm, once per provider release (see the top-level
+   `README.md` for the full build+deploy flow):
 
    ```sh
    task install PROVIDER=google

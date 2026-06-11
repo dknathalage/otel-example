@@ -22,10 +22,18 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
+# Name knob: every resource name derives from var.name unless the per-field
+# override var is set. Keeps the WIF binding (ksa_namespace_prefix/ksa_name) and
+# the Helm chart's serviceAccountName/namespace aligned by construction.
+locals {
+  ksa_namespace_prefix = coalesce(var.ksa_namespace_prefix, var.name)
+  ksa_name             = coalesce(var.ksa_name, var.name)
+}
+
 # --- Artifact Registry (Docker images) ---
 resource "google_artifact_registry_repository" "docker" {
   location      = var.region
-  repository_id = "otel-poc"
+  repository_id = var.name
   format        = "DOCKER"
   description   = "OTel POC app images"
   depends_on    = [google_project_service.apis]
@@ -33,7 +41,7 @@ resource "google_artifact_registry_repository" "docker" {
 
 # --- Workload identity GCP service account for all workloads + the collector ---
 resource "google_service_account" "app" {
-  account_id   = "otel-poc"
+  account_id   = var.name
   display_name = "OTel POC workloads"
 }
 
@@ -62,12 +70,12 @@ resource "google_project_iam_member" "gsa" {
   member   = "serviceAccount:${google_service_account.app.email}"
 }
 
-# --- WIF: bind each release's KSA (otel-poc-<release>/otel-poc) to the GSA ---
+# --- WIF: bind each release's KSA (<prefix>-<release>/<ksa>) to the GSA ---
 resource "google_service_account_iam_member" "wif" {
   for_each           = toset(var.releases)
   service_account_id = google_service_account.app.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project}.svc.id.goog[${var.ksa_namespace_prefix}-${each.value}/${var.ksa_name}]"
+  member             = "serviceAccount:${var.project}.svc.id.goog[${local.ksa_namespace_prefix}-${each.value}/${local.ksa_name}]"
 }
 
 # --- GSM secret containers (versions added out-of-band when tokens are available) ---
@@ -129,7 +137,7 @@ resource "google_firestore_database" "default" {
 
 # --- Cloud SQL Postgres (cheapest: db-f1-micro shared-core / ENTERPRISE / zonal / HDD / no backups) ---
 resource "google_sql_database_instance" "orders" {
-  name                = "otel-poc"
+  name                = var.name
   database_version    = "POSTGRES_16"
   region              = var.region
   deletion_protection = false
@@ -166,8 +174,8 @@ resource "google_sql_database" "orders" {
 
 # --- Memorystore Redis (cheapest: BASIC tier, 1 GB, direct peering on the default VPC) ---
 resource "google_redis_instance" "cache" {
-  name               = "otel-poc"
-  display_name       = "otel-poc"
+  name               = var.name
+  display_name       = var.name
   tier               = "BASIC"
   memory_size_gb     = 1
   region             = var.region

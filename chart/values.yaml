@@ -1,14 +1,18 @@
 # otel-stack — single-backend microservice stack (api + worker + web + collector).
-# Install once per backend/namespace; the base file targets the Google backend in the
-# otel-poc-google namespace. dash0 / coralogix are thin overlays (values-*.yaml).
+# Install once per backend/namespace. The base file targets the Google backend; dash0 /
+# coralogix are thin overlays (values-*.yaml). Project/region/registry/SA are supplied at
+# install time (see Taskfile) so nothing here is tied to one GCP project.
 
 # ── Release target (per-install) ──
-nameOverride: ""              # overrides the chart name in the release/name helper
-namespace: otel-poc-google    # rendered into every resource's metadata.namespace; MUST
-                              # equal the install `-n`. Matches the tofu WIF binding.
-gcpProject: focal-fossa-dev
-region: us-central1           # GCP region — resource attributes only. NOT the dash0 AWS
-                              # region (that lives literally in backend.endpoint).
+appName: otel-poc             # base name; drives namespace prefix, service account,
+                              # release-prefix strip, labels, ingress. MUST equal the
+                              # tofu `name` (APP_NAME). Override individual fields below.
+nameOverride: ""              # overrides the release-prefix strip in the name helper
+# namespace: (unset)          # defaults to the install `-n` (Release.Namespace). The
+                              # Taskfile installs into <appName>-<provider>.
+gcpProject: ""                # set at install time (--set), e.g. via $GCP_PROJECT
+region: ""                    # GCP region — resource attributes only; set at install
+                              # time. NOT the dash0 AWS region (that's in backend.endpoint).
 
 # ── Backend: the ONE backend this release exports to ──
 backend:
@@ -27,7 +31,7 @@ collector:
 # ── Image defaults (global) ── keeps the CI `--set image.tag=<git-sha>` flow working.
 # Per-component blocks supply `repo`; registry/tag inherit unless overridden.
 image:
-  registry: us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc
+  registry: ""                # set at install time (--set), e.g. <region>-docker.pkg.dev/<project>/<appName>
   tag: dev
 
 # ── Components ──
@@ -61,7 +65,9 @@ ingress:
 webOrigin: "https://web.example.com"
 
 # ── Workload Identity ──
-# KSA name is PINNED to `otel-poc` (the tofu ksa_name the WIF binding targets) — do not
-# derive it from the chart/release name. The GSA annotation is always rendered.
-serviceAccountName: otel-poc
-gcpServiceAccount: "otel-poc@focal-fossa-dev.iam.gserviceaccount.com"
+# serviceAccountName defaults to appName and MUST equal the tofu ksa_name the WIF binding
+# targets (both derive from the same base name). gcpServiceAccount defaults to
+# <serviceAccountName>@<gcpProject>.iam.gserviceaccount.com; override only if your GSA
+# email differs. Set explicitly to override either.
+serviceAccountName: ""
+gcpServiceAccount: ""

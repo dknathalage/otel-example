@@ -63,7 +63,7 @@ data:
       coralogix:
         domain: "{{ $be.domain }}"
         private_key: "{{ include "otel-stack.secretRef" (dict "root" $ "name" $be.auth.secretRef) }}"
-        application_name: "{{ $be.appName }}"
+        application_name: "{{ $be.appName | default $.Values.appName }}"
         subsystem_name: "${env:HOSTNAME}"
       {{- end }}
     service:

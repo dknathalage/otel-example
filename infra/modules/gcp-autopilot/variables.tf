@@ -9,7 +9,14 @@ variable "region" {
   default     = "us-central1"
 }
 
+variable "name" {
+  type        = string
+  description = "Base name; the cluster name derives from this unless cluster_name is set."
+  default     = "otel-poc"
+}
+
 variable "cluster_name" {
-  type    = string
-  default = "otel-poc"
+  type        = string
+  description = "GKE cluster name. Empty => derive from var.name."
+  default     = ""
 }

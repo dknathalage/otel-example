@@ -1,7 +1,6 @@
-# Dash0 backend overlay. Install:
-#   helm upgrade --install otel-poc-dash0 ./chart -f chart/values-dash0.yaml \
-#     -n otel-poc-dash0 --create-namespace
-namespace: otel-poc-dash0
+# Dash0 backend overlay. Install (namespace follows the install -n):
+#   helm upgrade --install <appName>-dash0 ./chart -f chart/values-dash0.yaml \
+#     -n <appName>-dash0 --create-namespace
 
 backend:
   type: otlphttp

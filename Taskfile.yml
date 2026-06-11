@@ -1,6 +1,7 @@
 version: "3"
 # Build + deploy the OTel multi-backend POC to GKE.
 #
+#   export GCP_PROJECT=my-project [GCP_REGION=us-central1] [APP_NAME=otel-poc]
 #   task ship PROVIDER=google     # build amd64 + push + helm install (one backend)
 #   task build                    # build all 3 amd64 images
 #   task push                     # push images to Artifact Registry
@@ -10,15 +11,16 @@ version: "3"
 # emulation, which (unlike qemu) does not crash .NET's MSBuild when cross-building on an
 # arm64 Mac. The .NET apps publish INSIDE the image (proper multi-stage build). Requires
 # a running Docker Desktop with Rosetta amd64 emulation enabled.
+# Set GCP_PROJECT (required) and optionally GCP_REGION / APP_NAME before running.
+# CLOUDSQL_CONN and REDIS_HOST are read live from `terragrunt output` by the install
+# task — they require `task apply:foundation` to have run first.
 vars:
   TAG: { sh: git rev-parse --short HEAD }
-  REGISTRY: '{{.REGISTRY | default "us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc"}}'
-  PROJECT: '{{.PROJECT | default "focal-fossa-dev"}}'
-  REGION: '{{.REGION | default "us-central1"}}'
-  CLUSTER: '{{.CLUSTER | default "otel-poc"}}'
-  # From `terragrunt output` in infra/live/foundation:
-  CLOUDSQL_CONN: '{{.CLOUDSQL_CONN | default "focal-fossa-dev:us-central1:otel-poc"}}'
-  REDIS_HOST: '{{.REDIS_HOST | default "10.104.117.155"}}'
+  APP_NAME: { sh: 'echo "${APP_NAME:-otel-poc}"' }
+  PROJECT: { sh: 'echo "${GCP_PROJECT:?GCP_PROJECT must be set, e.g. export GCP_PROJECT=my-project}"' }
+  REGION: { sh: 'echo "${GCP_REGION:-us-central1}"' }
+  REGISTRY: '{{.REGION}}-docker.pkg.dev/{{.PROJECT}}/{{.APP_NAME}}'
+  CLUSTER: '{{.CLUSTER | default .APP_NAME}}'
 
 tasks:
   login:
@@ -62,14 +64,20 @@ tasks:
     desc: Install one backend stack into its namespace (PROVIDER=google|dash0|coralogix)
     vars:
       PROVIDER: '{{.PROVIDER | default "google"}}'
+      CLOUDSQL_CONN: { sh: 'cd infra/live/foundation && terragrunt output -raw cloudsql_connection_name' }
+      REDIS_HOST: { sh: 'cd infra/live/foundation && terragrunt output -raw redis_host' }
     cmds:
       - >-
-        helm upgrade --install otel-poc-{{.PROVIDER}} ./chart
+        helm upgrade --install {{.APP_NAME}}-{{.PROVIDER}} ./chart
         -f chart/values-{{.PROVIDER}}.yaml
+        --set appName={{.APP_NAME}}
+        --set gcpProject={{.PROJECT}}
+        --set region={{.REGION}}
+        --set image.registry={{.REGISTRY}}
         --set image.tag={{.TAG}}
         --set components.api.cloudsql.connectionName={{.CLOUDSQL_CONN}}
         --set components.api.redis.host={{.REDIS_HOST}}
-        -n otel-poc-{{.PROVIDER}} --create-namespace
+        -n {{.APP_NAME}}-{{.PROVIDER}} --create-namespace
 
   ship:
     desc: Full path — login, build+push amd64 images, deploy one backend (PROVIDER=google)

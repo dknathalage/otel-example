@@ -19,7 +19,7 @@ spec:
         {{- include "otel-stack.labels" . | nindent 8 }}
         app.kubernetes.io/name: web
     spec:
-      serviceAccountName: {{ .Values.serviceAccountName }}
+      serviceAccountName: {{ include "otel-stack.serviceAccountName" . }}
       containers:
         - name: web
           image: "{{ include "otel-stack.image" (dict "comp" $c "root" .) }}"

@@ -21,7 +21,7 @@ spec:
         # Roll the pod when the rendered config changes.
         checksum/config: {{ include (print $.Template.BasePath "/collector-configmap.yaml") . | sha256sum }}
     spec:
-      serviceAccountName: {{ .Values.serviceAccountName }}
+      serviceAccountName: {{ include "otel-stack.serviceAccountName" . }}
       containers:
         - name: collector
           image: "{{ .Values.collector.image }}"
