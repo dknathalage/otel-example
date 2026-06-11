@@ -711,6 +711,8 @@ public static class OrdersEndpoints
             await repo.AddAsync(new OrderEntity {
                 Id = id, Sku = req.Sku, Quantity = req.Quantity,
                 CreatedAt = DateTimeOffset.UtcNow }, ct);
+            using var _ = log.BeginScope(new Dictionary<string, object> {
+                [Core.Logging.LoggingConventions.OrderId] = id });
             await pub.PublishAsync(new OrderMessage(id, req.Sku, req.Quantity), ct);
             log.LogInformation("order {OrderId} created", id);
             return Results.Accepted($"/orders/{id}", new { id });
@@ -800,6 +802,8 @@ public sealed class OrderConsumer(
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
         => subscriber.StartAsync(async (order, ct) =>
         {
+            using var _ = log.BeginScope(new Dictionary<string, object> {
+                [Core.Logging.LoggingConventions.OrderId] = order.Id });
             await store.UpsertStatusAsync(order.Id, "processed", ct);
             log.LogInformation("order {OrderId} processed", order.Id);
         }, stoppingToken);
@@ -1143,7 +1147,7 @@ Expected: each renders the right exporter, no `<no value>`.
 
 **Files:** Create `templates/collector.yaml`
 
-- [ ] **Step 1:** Deployment using the **Google-Built Collector** image (bundles googleclientauth + googlesecretmanager provider), mount the ConfigMap, set `GCP_PROJECT` env, expose 4317/4318, command `--config=/conf/config.yaml`; Service `collector:4317/4318`. (Pin the exact image ref at impl time.)
+- [ ] **Step 1:** Deployment using the **Google-Built Collector** image (bundles googleclientauth + googlesecretmanager provider), mount the ConfigMap, expose 4317/4318, command `--config=/conf/config.yaml`; Service `collector:4317/4318`. (Pin the exact image ref at impl time.) No `GCP_PROJECT` env needed — the project is Helm-rendered into the config (`resource/gcp` value + GSM URIs), and `googleclientauth` derives the project from ADC/metadata.
 - [ ] **Step 2: template-check + commit** (`feat(helm): collector deployment+service`)
 
 ### Task 6.4: App Deployments + Services + ServiceAccount
