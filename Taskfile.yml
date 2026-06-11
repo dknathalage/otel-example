@@ -12,6 +12,14 @@ tasks:
   kind-load:
     cmds:
       - kind load docker-image otel-poc/api:{{.TAG}} otel-poc/worker:{{.TAG}} otel-poc/web:{{.TAG}}
+  creds:gke:
+    desc: Point kubeconfig at an existing GKE cluster (override CLUSTER/REGION/PROJECT)
+    vars:
+      CLUSTER: '{{.CLUSTER | default "otel-poc"}}'
+      REGION: '{{.REGION | default "us-central1"}}'
+      PROJECT: '{{.PROJECT | default "focal-fossa-dev"}}'
+    cmds:
+      - gcloud container clusters get-credentials {{.CLUSTER}} --region {{.REGION}} --project {{.PROJECT}}
   install:
     cmds:
       - helm upgrade --install otel-poc-{{.PROVIDER}} deploy/helm/otel-poc -f deploy/helm/otel-poc/values-local.yaml --set provider={{.PROVIDER}} --set image.tag={{.TAG}} -n otel-poc-{{.PROVIDER}} --create-namespace
