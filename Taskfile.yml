@@ -89,3 +89,32 @@ tasks:
       - task: push
       - task: install
         vars: { PROVIDER: "{{.PROVIDER}}" }
+
+  pf:
+    desc: Port-forward web(3000) api(8080) collector(4318/4317) for one release (PROVIDER=google)
+    vars:
+      PROVIDER: '{{.PROVIDER | default "google"}}'
+      NS: '{{.APP_NAME}}-{{.PROVIDER}}'
+    cmds:
+      - |
+        trap 'kill 0' EXIT INT TERM
+        kubectl port-forward -n {{.NS}} svc/web 3000:80 &
+        kubectl port-forward -n {{.NS}} svc/api 8080:80 &
+        kubectl port-forward -n {{.NS}} svc/collector 4318:4318 4317:4317 &
+        echo "web=http://localhost:3000  api=http://localhost:8080  collector otlp-http=4318 otlp-grpc=4317  (Ctrl-C to stop)"
+        wait
+
+  pf:web:
+    desc: Port-forward only the web UI (localhost:3000) for one release (PROVIDER=google)
+    vars: { PROVIDER: '{{.PROVIDER | default "google"}}' }
+    cmds: ["kubectl port-forward -n {{.APP_NAME}}-{{.PROVIDER}} svc/web 3000:80"]
+
+  pf:api:
+    desc: Port-forward only the API (localhost:8080) for one release (PROVIDER=google)
+    vars: { PROVIDER: '{{.PROVIDER | default "google"}}' }
+    cmds: ["kubectl port-forward -n {{.APP_NAME}}-{{.PROVIDER}} svc/api 8080:80"]
+
+  pf:collector:
+    desc: Port-forward only the collector OTLP (4318 http / 4317 grpc) for one release (PROVIDER=google)
+    vars: { PROVIDER: '{{.PROVIDER | default "google"}}' }
+    cmds: ["kubectl port-forward -n {{.APP_NAME}}-{{.PROVIDER}} svc/collector 4318:4318 4317:4317"]
