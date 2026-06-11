@@ -1,0 +1,15 @@
+<Project>
+  <ItemGroup>
+    <PackageVersion Include="Google.Cloud.SecretManager.V1" Version="2.*" />
+    <PackageVersion Include="Google.Cloud.PubSub.V1" Version="3.*" />
+    <PackageVersion Include="Google.Cloud.Firestore" Version="3.*" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.*" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.*" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.*" />
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.*" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.*" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.*" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.*" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.*" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,17 @@
+version: "3"
+vars:
+  TAG: { sh: git rev-parse --short HEAD }
+tasks:
+  build:dotnet: { cmds: ["dotnet build OtelPoc.slnx"] }
+  build:web: { dir: src/Web, cmds: ["npm ci", "npm run build"] }
+  images:
+    cmds:
+      - podman build -t otel-poc/api:{{.TAG}} -f src/Api/Dockerfile .
+      - podman build -t otel-poc/worker:{{.TAG}} -f src/Worker/Dockerfile .
+      - podman build -t otel-poc/web:{{.TAG}} -f src/Web/Dockerfile src/Web
+  kind-load:
+    cmds:
+      - kind load docker-image otel-poc/api:{{.TAG}} otel-poc/worker:{{.TAG}} otel-poc/web:{{.TAG}}
+  install:
+    cmds:
+      - helm upgrade --install otel-poc-{{.PROVIDER}} deploy/helm/otel-poc -f deploy/helm/otel-poc/values-local.yaml --set provider={{.PROVIDER}} --set image.tag={{.TAG}} -n otel-poc-{{.PROVIDER}} --create-namespace
