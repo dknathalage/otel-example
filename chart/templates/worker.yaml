@@ -1,31 +1,39 @@
+{{- if .Values.components.worker.enabled }}
+{{- $c := .Values.components.worker }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker
+  namespace: {{ include "otel-stack.namespace" . }}
   labels:
-    {{- include "otel-poc.labels" . | nindent 4 }}
+    {{- include "otel-stack.labels" . | nindent 4 }}
     app.kubernetes.io/name: worker
 spec:
-  replicas: 1
+  replicas: {{ $c.replicas }}
   selector:
     matchLabels:
       app.kubernetes.io/name: worker
   template:
     metadata:
       labels:
-        {{- include "otel-poc.labels" . | nindent 8 }}
+        {{- include "otel-stack.labels" . | nindent 8 }}
         app.kubernetes.io/name: worker
     spec:
-      serviceAccountName: otel-poc
+      serviceAccountName: {{ .Values.serviceAccountName }}
       containers:
         - name: worker
-          image: "{{ .Values.image.registry }}/worker:{{ .Values.image.tag }}"
+          image: "{{ include "otel-stack.image" (dict "comp" $c "root" .) }}"
           env:
-            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-poc.otlpEndpoint" . }}" }
-            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-poc.resourceAttributes" . }}" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-stack.resourceAttributes" . }}" }
             - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
             - { name: PubSub__ProjectId, value: "{{ .Values.gcpProject }}" }
-            - { name: PubSub__TopicId, value: "{{ include "otel-poc.topic" . }}" }
-            - { name: PubSub__SubscriptionId, value: "{{ include "otel-poc.subscription" . }}" }
+            - { name: PubSub__TopicId, value: "{{ include "otel-stack.topic" . }}" }
+            - { name: PubSub__SubscriptionId, value: "{{ include "otel-stack.subscription" . }}" }
             - { name: Firestore__ProjectId, value: "{{ .Values.gcpProject }}" }
-            - { name: Firestore__CollectionPrefix, value: "{{ include "otel-poc.prefix" . }}" }
+            - { name: Firestore__CollectionPrefix, value: "{{ include "otel-stack.prefix" . }}" }
+          {{- with $c.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

@@ -87,6 +87,21 @@ resource "google_secret_manager_secret" "coralogix_key" {
   depends_on = [google_project_service.apis]
 }
 
+# Secret versions (the actual credentials). count-skipped when the var is empty so the
+# apply succeeds before a token is on hand. The collector reads these at runtime via the
+# googlesecretmanager confmap provider under Workload Identity.
+resource "google_secret_manager_secret_version" "dash0_token" {
+  count       = var.dash0_token == "" ? 0 : 1
+  secret      = google_secret_manager_secret.dash0_token.id
+  secret_data = var.dash0_token
+}
+
+resource "google_secret_manager_secret_version" "coralogix_key" {
+  count       = var.coralogix_key == "" ? 0 : 1
+  secret      = google_secret_manager_secret.coralogix_key.id
+  secret_data = var.coralogix_key
+}
+
 # --- Per-release Pub/Sub topic + subscription ---
 resource "google_pubsub_topic" "orders" {
   for_each   = toset(var.releases)

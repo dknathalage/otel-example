@@ -1,13 +1,18 @@
+{{- $be := .Values.backend -}}
+{{- $gcp := eq $be.type "googleAuthOtlp" -}}
+{{- $dbg := .Values.collector.debug -}}
+{{- $exp := ternary "coralogix" "otlphttp/be" (eq $be.type "coralogix") -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: collector-config
+  namespace: {{ include "otel-stack.namespace" . }}
   labels:
-    {{- include "otel-poc.labels" . | nindent 4 }}
+    {{- include "otel-stack.labels" . | nindent 4 }}
 data:
   config.yaml: |
     extensions:
-      {{- if eq .Values.provider "google" }}
+      {{- if $gcp }}
       googleclientauth: {}
       {{- end }}
     receivers:
@@ -22,55 +27,59 @@ data:
               allowed_headers: ["*"]
     processors:
       batch: {}
-      {{- if eq .Values.provider "google" }}
+      {{- if $gcp }}
       resource/gcp:
         attributes:
           - { key: gcp.project_id, value: "{{ .Values.gcpProject }}", action: upsert }
-      {{- if eq .Values.env "gke" }}
       resourcedetection/gcp:
         detectors: [env, gcp]
         timeout: 2s
         override: false
       {{- end }}
-      {{- end }}
     exporters:
-      {{- if .Values.collector.debug }}
+      {{- if $dbg }}
       debug:
         verbosity: detailed
       {{- end }}
-      {{- if eq .Values.provider "google" }}
+      {{- if $gcp }}
       otlphttp/be:
-        endpoint: https://telemetry.googleapis.com
+        endpoint: {{ $be.endpoint }}
         encoding: proto
         auth:
           authenticator: googleclientauth
-      {{- else if eq .Values.provider "dash0" }}
+      {{- else if eq $be.type "otlphttp" }}
       otlphttp/be:
-        endpoint: https://ingress.{{ .Values.providers.dash0.region }}.aws.dash0.com
+        endpoint: {{ $be.endpoint }}
+        {{- if or $be.headers $be.auth }}
         headers:
-          Authorization: "Bearer ${googlesecretmanager:projects/{{ .Values.gcpProject }}/secrets/dash0-token/versions/latest}"
-          Dash0-Dataset: "{{ .Values.providers.dash0.dataset }}"
-      {{- else if eq .Values.provider "coralogix" }}
+          {{- range $k, $v := $be.headers }}
+          {{ $k }}: "{{ $v }}"
+          {{- end }}
+          {{- if $be.auth }}
+          {{ $be.auth.header }}: "{{ $be.auth.scheme }} {{ include "otel-stack.secretRef" (dict "root" $ "name" $be.auth.secretRef) }}"
+          {{- end }}
+        {{- end }}
+      {{- else if eq $be.type "coralogix" }}
       coralogix:
-        domain: "{{ .Values.providers.coralogix.domain }}"
-        private_key: "${googlesecretmanager:projects/{{ .Values.gcpProject }}/secrets/coralogix-key/versions/latest}"
-        application_name: "otel-poc"
+        domain: "{{ $be.domain }}"
+        private_key: "{{ include "otel-stack.secretRef" (dict "root" $ "name" $be.auth.secretRef) }}"
+        application_name: "{{ $be.appName }}"
         subsystem_name: "${env:HOSTNAME}"
       {{- end }}
     service:
-      {{- if eq .Values.provider "google" }}
+      {{- if $gcp }}
       extensions: [googleclientauth]
       {{- end }}
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [batch{{ if eq .Values.provider "google" }}, resource/gcp{{ if eq .Values.env "gke" }}, resourcedetection/gcp{{ end }}{{ end }}]
-          exporters: [{{ if .Values.collector.debug }}debug, {{ end }}{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+          processors: [batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
+          exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]
         metrics:
           receivers: [otlp]
-          processors: [batch{{ if eq .Values.provider "google" }}, resource/gcp{{ if eq .Values.env "gke" }}, resourcedetection/gcp{{ end }}{{ end }}]
-          exporters: [{{ if .Values.collector.debug }}debug, {{ end }}{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+          processors: [batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
+          exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]
         logs:
           receivers: [otlp]
           processors: [batch]
-          exporters: [{{ if .Values.collector.debug }}debug, {{ end }}{{ if eq .Values.provider "coralogix" }}coralogix{{ else }}otlphttp/be{{ end }}]
+          exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]

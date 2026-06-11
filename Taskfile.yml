@@ -1,6 +1,7 @@
 version: "3"
 vars:
   TAG: { sh: git rev-parse --short HEAD }
+  REGISTRY: '{{.REGISTRY | default "us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc"}}'
 tasks:
   build:dotnet: { cmds: ["dotnet build OtelPoc.slnx"] }
   build:web: { dir: src/Web, cmds: ["npm ci", "npm run build"] }
@@ -9,9 +10,13 @@ tasks:
       - podman build -t otel-poc/api:{{.TAG}} -f src/Api/Dockerfile .
       - podman build -t otel-poc/worker:{{.TAG}} -f src/Worker/Dockerfile .
       - podman build -t otel-poc/web:{{.TAG}} -f src/Web/Dockerfile src/Web
-  kind-load:
+  push:
+    desc: Tag local images and push to Artifact Registry (override REGISTRY)
     cmds:
-      - kind load docker-image otel-poc/api:{{.TAG}} otel-poc/worker:{{.TAG}} otel-poc/web:{{.TAG}}
+      - for: [api, worker, web]
+        cmd: |
+          podman tag otel-poc/{{.ITEM}}:{{.TAG}} {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
+          podman push {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
   creds:gke:
     desc: Point kubeconfig at an existing GKE cluster (override CLUSTER/REGION/PROJECT)
     vars:
@@ -21,5 +26,8 @@ tasks:
     cmds:
       - gcloud container clusters get-credentials {{.CLUSTER}} --region {{.REGION}} --project {{.PROJECT}}
   install:
+    desc: Install one backend stack into its namespace (PROVIDER=google|dash0|coralogix)
+    vars:
+      PROVIDER: '{{.PROVIDER | default "google"}}'
     cmds:
-      - helm upgrade --install otel-poc-{{.PROVIDER}} deploy/helm/otel-poc -f deploy/helm/otel-poc/values-local.yaml --set provider={{.PROVIDER}} --set image.tag={{.TAG}} -n otel-poc-{{.PROVIDER}} --create-namespace
+      - helm upgrade --install otel-poc-{{.PROVIDER}} ./chart -f chart/values-{{.PROVIDER}}.yaml --set image.tag={{.TAG}} -n otel-poc-{{.PROVIDER}} --create-namespace

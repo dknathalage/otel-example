@@ -1,0 +1,14 @@
+# Dash0 backend overlay. Install:
+#   helm upgrade --install otel-poc-dash0 ./chart -f chart/values-dash0.yaml \
+#     -n otel-poc-dash0 --create-namespace
+namespace: otel-poc-dash0
+
+backend:
+  type: otlphttp
+  endpoint: https://ingress.us-west-2.aws.dash0.com   # AWS region baked in literally
+  headers:
+    Dash0-Dataset: otel-poc
+  auth:
+    header: Authorization
+    scheme: Bearer
+    secretRef: dash0-token        # GSM secret name (value provisioned by tofu)

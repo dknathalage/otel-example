@@ -44,3 +44,20 @@ variable "cloudsql_password" {
   sensitive   = true
   default     = "otelpoc-dev-pw"
 }
+
+# Backend credentials written into GSM. Supply via TF_VAR_dash0_token / TF_VAR_coralogix_key
+# (or a gitignored/sops tfvars). Empty default => the secret version is skipped, so the
+# apply stays clean before a token is available.
+variable "dash0_token" {
+  type        = string
+  description = "Dash0 ingest auth token (Bearer). Stored in the dash0-token GSM secret."
+  sensitive   = true
+  default     = ""
+}
+
+variable "coralogix_key" {
+  type        = string
+  description = "Coralogix Send-Your-Data API key. Stored in the coralogix-key GSM secret."
+  sensitive   = true
+  default     = ""
+}

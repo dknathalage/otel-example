@@ -1,62 +1,67 @@
-# Which backend this release exports to. One of: google | dash0 | coralogix
-provider: google
+# otel-stack — single-backend microservice stack (api + worker + web + collector).
+# Install once per backend/namespace; the base file targets the Google backend in the
+# otel-poc-google namespace. dash0 / coralogix are thin overlays (values-*.yaml).
 
-# Deployment environment. One of: local | gke
-env: local
+# ── Release target (per-install) ──
+nameOverride: ""              # overrides the chart name in the release/name helper
+namespace: otel-poc-google    # rendered into every resource's metadata.namespace; MUST
+                              # equal the install `-n`. Matches the tofu WIF binding.
+gcpProject: focal-fossa-dev
+region: us-central1           # GCP region — resource attributes only. NOT the dash0 AWS
+                              # region (that lives literally in backend.endpoint).
 
-# GCP project id. Rendered into the collector config (resource/gcp value + GSM URIs).
-gcpProject: ""
+# ── Backend: the ONE backend this release exports to ──
+backend:
+  type: googleAuthOtlp        # googleAuthOtlp | otlphttp | coralogix
+  endpoint: https://telemetry.googleapis.com
 
-# Managed Cloud SQL Postgres. connectionName is set at deploy time (--set) from the
-# Tofu output cloudsql_connection_name (project:region:instance). The API reaches
-# Postgres through the cloud-sql-proxy sidecar on 127.0.0.1:5432.
-cloudsql:
-  connectionName: ""
-  user: otel
-  password: "otelpoc-dev-pw"
-
-# Managed Memorystore Redis. host is set at deploy time (--set) from the Tofu output
-# redis_host. Only the API uses Redis.
-redis:
-  host: ""
-  port: 6379
-
-# App container images. Match the local podman image names: otel-poc/api:dev etc.
-image:
-  registry: "otel-poc"
-  tag: "dev"
-
-# Collector image. Google-Built OpenTelemetry Collector distro: it bundles BOTH the
-# googleclientauth extension (Google OTLP auth) AND the googlesecretmanager confmap
-# provider (used by the dash0/coralogix GSM secret refs).
+# ── Collector ──
 collector:
-  image: "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.151.0"
-  # When true, add a debug exporter (verbosity: detailed) to every pipeline so the
-  # span tree is visible in collector logs regardless of backend.
-  debug: false
+  enabled: true
+  image: us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.151.0
+  debug: true
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
 
-# Per-provider settings.
-providers:
-  google: {}
-  dash0:
-    region: us-west-2
-    dataset: otel-poc
-  coralogix:
-    domain: eu2.coralogix.com
+# ── Image defaults (global) ── keeps the CI `--set image.tag=<git-sha>` flow working.
+# Per-component blocks supply `repo`; registry/tag inherit unless overridden.
+image:
+  registry: us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc
+  tag: dev
 
-# Workload Identity: GCP service account email bound to the KSA (only used when env=gke).
-gcpServiceAccount: ""
+# ── Components ──
+components:
+  api:
+    enabled: true
+    image: { repo: api }
+    replicas: 1
+    resources: {}
+    cloudsql: { connectionName: "", user: otel, password: "otelpoc-dev-pw" }
+    redis:    { host: "", port: 6379 }
+    pubsub:   { enabled: true }
+  worker:
+    enabled: true
+    image: { repo: worker }
+    replicas: 1
+    resources: {}
+  web:
+    enabled: true
+    image: { repo: web }
+    replicas: 1
+    resources: {}
+    apiUrl: "https://api.example.com"
+    otlpHttpUrl: "https://otlp.example.com/v1/traces"
 
-# Browser origin allowed by the collector OTLP/http CORS config (never "*").
-webOrigin: "http://localhost:3000"
-
-# Ingress host suffix; per-component hosts are derived from the release name.
+# ── Ingress / browser ──
 ingress:
   enabled: true
   className: ""
-  host: "localhost"
+  host: example.com
+webOrigin: "https://web.example.com"
 
-# Public URLs handed to the web app (browser-side).
-web:
-  apiUrl: "http://localhost/api"
-  otlpHttpUrl: "http://localhost/otlp/v1/traces"
+# ── Workload Identity ──
+# KSA name is PINNED to `otel-poc` (the tofu ksa_name the WIF binding targets) — do not
+# derive it from the chart/release name. The GSA annotation is always rendered.
+serviceAccountName: otel-poc
+gcpServiceAccount: "otel-poc@focal-fossa-dev.iam.gserviceaccount.com"

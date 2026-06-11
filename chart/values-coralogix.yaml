@@ -1,0 +1,11 @@
+# Coralogix backend overlay. Install:
+#   helm upgrade --install otel-poc-coralogix ./chart -f chart/values-coralogix.yaml \
+#     -n otel-poc-coralogix --create-namespace
+namespace: otel-poc-coralogix
+
+backend:
+  type: coralogix
+  domain: eu2.coralogix.com
+  appName: otel-poc
+  auth:
+    secretRef: coralogix-key        # GSM secret name (value provisioned by tofu)

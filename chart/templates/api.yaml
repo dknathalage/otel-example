@@ -1,30 +1,33 @@
+{{- if .Values.components.api.enabled }}
+{{- $c := .Values.components.api }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api
+  namespace: {{ include "otel-stack.namespace" . }}
   labels:
-    {{- include "otel-poc.labels" . | nindent 4 }}
+    {{- include "otel-stack.labels" . | nindent 4 }}
     app.kubernetes.io/name: api
 spec:
-  replicas: 1
+  replicas: {{ $c.replicas }}
   selector:
     matchLabels:
       app.kubernetes.io/name: api
   template:
     metadata:
       labels:
-        {{- include "otel-poc.labels" . | nindent 8 }}
+        {{- include "otel-stack.labels" . | nindent 8 }}
         app.kubernetes.io/name: api
     spec:
-      serviceAccountName: otel-poc
+      serviceAccountName: {{ .Values.serviceAccountName }}
       containers:
         - name: api
-          image: "{{ .Values.image.registry }}/api:{{ .Values.image.tag }}"
+          image: "{{ include "otel-stack.image" (dict "comp" $c "root" .) }}"
           ports:
             - { name: http, containerPort: 8080 }
           env:
-            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-poc.otlpEndpoint" . }}" }
-            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-poc.resourceAttributes" . }}" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-stack.resourceAttributes" . }}" }
             - { name: ASPNETCORE_URLS, value: "http://0.0.0.0:8080" }
             - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
             # Cloud SQL: app talks to the Auth Proxy sidecar on 127.0.0.1:5432.
@@ -34,12 +37,16 @@ spec:
                   name: cloudsql
                   key: password
             - name: ConnectionStrings__Orders
-              value: "Host=127.0.0.1;Port=5432;Database={{ include "otel-poc.pgdb" . }};Username={{ .Values.cloudsql.user }};Password=$(CLOUDSQL_PASSWORD)"
-            - { name: Redis__ConnectionString, value: "{{ .Values.redis.host }}:{{ .Values.redis.port }}" }
-            - { name: Redis__KeyPrefix, value: "{{ include "otel-poc.prefix" . }}" }
+              value: "Host=127.0.0.1;Port=5432;Database={{ include "otel-stack.pgdb" . }};Username={{ $c.cloudsql.user }};Password=$(CLOUDSQL_PASSWORD)"
+            - { name: Redis__ConnectionString, value: "{{ $c.redis.host }}:{{ $c.redis.port }}" }
+            - { name: Redis__KeyPrefix, value: "{{ include "otel-stack.prefix" . }}" }
             - { name: PubSub__ProjectId, value: "{{ .Values.gcpProject }}" }
-            - { name: PubSub__TopicId, value: "{{ include "otel-poc.topic" . }}" }
-            - { name: PubSub__SubscriptionId, value: "{{ include "otel-poc.subscription" . }}" }
+            - { name: PubSub__TopicId, value: "{{ include "otel-stack.topic" . }}" }
+            - { name: PubSub__SubscriptionId, value: "{{ include "otel-stack.subscription" . }}" }
+          {{- with $c.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         # Cloud SQL Auth Proxy: authenticates via Workload Identity, exposes Postgres on localhost.
         - name: cloud-sql-proxy
           image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest"
@@ -48,7 +55,7 @@ spec:
             - "--port=5432"
             - "$(CLOUDSQL_CONNECTION_NAME)"
           env:
-            - { name: CLOUDSQL_CONNECTION_NAME, value: "{{ .Values.cloudsql.connectionName }}" }
+            - { name: CLOUDSQL_CONNECTION_NAME, value: "{{ $c.cloudsql.connectionName }}" }
           resources:
             requests:
               cpu: 50m
@@ -61,11 +68,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: api
+  namespace: {{ include "otel-stack.namespace" . }}
   labels:
-    {{- include "otel-poc.labels" . | nindent 4 }}
+    {{- include "otel-stack.labels" . | nindent 4 }}
     app.kubernetes.io/name: api
 spec:
   selector:
     app.kubernetes.io/name: api
   ports:
     - { name: http, port: 80, targetPort: 8080 }
+{{- end }}

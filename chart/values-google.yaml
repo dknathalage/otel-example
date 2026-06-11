@@ -1,0 +1,14 @@
+# Google Cloud native backend overlay (explicit twin of the chart defaults).
+# Exports straight to the GCP OTLP telemetry endpoint (telemetry.googleapis.com) using
+# the googleclientauth extension (Workload Identity) — no API key, no GSM secret. Traces
+# land in Cloud Trace, metrics in Cloud Monitoring, logs in Cloud Logging. The collector
+# adds resource/gcp + resourcedetection/gcp on the traces+metrics pipelines.
+#
+# Install:
+#   helm upgrade --install otel-poc-google ./chart -f chart/values-google.yaml \
+#     -n otel-poc-google --create-namespace
+namespace: otel-poc-google
+
+backend:
+  type: googleAuthOtlp
+  endpoint: https://telemetry.googleapis.com   # GCP unified OTLP ingest

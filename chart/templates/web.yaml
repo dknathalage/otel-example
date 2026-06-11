@@ -1,42 +1,51 @@
+{{- if .Values.components.web.enabled }}
+{{- $c := .Values.components.web }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
+  namespace: {{ include "otel-stack.namespace" . }}
   labels:
-    {{- include "otel-poc.labels" . | nindent 4 }}
+    {{- include "otel-stack.labels" . | nindent 4 }}
     app.kubernetes.io/name: web
 spec:
-  replicas: 1
+  replicas: {{ $c.replicas }}
   selector:
     matchLabels:
       app.kubernetes.io/name: web
   template:
     metadata:
       labels:
-        {{- include "otel-poc.labels" . | nindent 8 }}
+        {{- include "otel-stack.labels" . | nindent 8 }}
         app.kubernetes.io/name: web
     spec:
-      serviceAccountName: otel-poc
+      serviceAccountName: {{ .Values.serviceAccountName }}
       containers:
         - name: web
-          image: "{{ .Values.image.registry }}/web:{{ .Values.image.tag }}"
+          image: "{{ include "otel-stack.image" (dict "comp" $c "root" .) }}"
           ports:
             - { name: http, containerPort: 3000 }
           env:
-            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-poc.otlpEndpoint" . }}" }
-            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-poc.resourceAttributes" . }}" }
-            - { name: NEXT_PUBLIC_API_URL, value: "{{ .Values.web.apiUrl }}" }
-            - { name: NEXT_PUBLIC_OTLP_HTTP_URL, value: "{{ .Values.web.otlpHttpUrl }}" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-stack.resourceAttributes" . }}" }
+            - { name: NEXT_PUBLIC_API_URL, value: "{{ $c.apiUrl }}" }
+            - { name: NEXT_PUBLIC_OTLP_HTTP_URL, value: "{{ $c.otlpHttpUrl }}" }
+          {{- with $c.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: web
+  namespace: {{ include "otel-stack.namespace" . }}
   labels:
-    {{- include "otel-poc.labels" . | nindent 4 }}
+    {{- include "otel-stack.labels" . | nindent 4 }}
     app.kubernetes.io/name: web
 spec:
   selector:
     app.kubernetes.io/name: web
   ports:
     - { name: http, port: 80, targetPort: 3000 }
+{{- end }}

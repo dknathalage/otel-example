@@ -3,15 +3,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: otel-poc
+  namespace: {{ include "otel-stack.namespace" . }}
   labels:
-    {{- include "otel-poc.labels" . | nindent 4 }}
+    {{- include "otel-stack.labels" . | nindent 4 }}
 spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
   rules:
+    {{- if .Values.components.web.enabled }}
     # Web UI
-    - host: "web-{{ include "otel-poc.release" . }}.{{ .Values.ingress.host }}"
+    - host: "web-{{ include "otel-stack.release" . }}.{{ .Values.ingress.host }}"
       http:
         paths:
           - path: /
@@ -21,8 +23,10 @@ spec:
                 name: web
                 port:
                   number: 80
+    {{- end }}
+    {{- if .Values.components.api.enabled }}
     # API
-    - host: "api-{{ include "otel-poc.release" . }}.{{ .Values.ingress.host }}"
+    - host: "api-{{ include "otel-stack.release" . }}.{{ .Values.ingress.host }}"
       http:
         paths:
           - path: /
@@ -32,8 +36,10 @@ spec:
                 name: api
                 port:
                   number: 80
+    {{- end }}
+    {{- if .Values.collector.enabled }}
     # Browser OTLP/http ingest into the collector
-    - host: "otlp-{{ include "otel-poc.release" . }}.{{ .Values.ingress.host }}"
+    - host: "otlp-{{ include "otel-stack.release" . }}.{{ .Values.ingress.host }}"
       http:
         paths:
           - path: /
@@ -43,4 +49,5 @@ spec:
                 name: collector
                 port:
                   number: 4318
+    {{- end }}
 {{- end }}
