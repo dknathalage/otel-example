@@ -1,33 +1,89 @@
 version: "3"
+# Build + deploy the OTel multi-backend POC to GKE.
+#
+#   task ship PROVIDER=google     # publish + build amd64 + push + helm install (one backend)
+#   task build                    # host-publish .NET + build all 3 amd64 images
+#   task push                     # push images to Artifact Registry
+#   task install PROVIDER=dash0   # helm upgrade --install one backend stack
+#
+# Images are built linux/amd64 (GKE nodes are amd64). The .NET apps are published on the
+# HOST (native) and the Dockerfiles only COPY the output — this avoids the qemu/.NET
+# MSBuild crash when cross-building on an arm64 Mac. Requires a running podman machine.
 vars:
   TAG: { sh: git rev-parse --short HEAD }
   REGISTRY: '{{.REGISTRY | default "us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc"}}'
+  PROJECT: '{{.PROJECT | default "focal-fossa-dev"}}'
+  REGION: '{{.REGION | default "us-central1"}}'
+  CLUSTER: '{{.CLUSTER | default "otel-poc"}}'
+  # From `terragrunt output` in infra/live/foundation:
+  CLOUDSQL_CONN: '{{.CLOUDSQL_CONN | default "focal-fossa-dev:us-central1:otel-poc"}}'
+  REDIS_HOST: '{{.REDIS_HOST | default "10.104.117.155"}}'
+
 tasks:
-  build:dotnet: { cmds: ["dotnet build OtelPoc.slnx"] }
-  build:web: { dir: src/Web, cmds: ["npm ci", "npm run build"] }
-  images:
+  publish:
+    desc: Host-publish the .NET apps (native, portable IL) into ./publish
     cmds:
-      - podman build -t otel-poc/api:{{.TAG}} -f src/Api/Dockerfile .
-      - podman build -t otel-poc/worker:{{.TAG}} -f src/Worker/Dockerfile .
-      - podman build -t otel-poc/web:{{.TAG}} -f src/Web/Dockerfile src/Web
+      - dotnet publish src/Api -c Release -o ./publish/api
+      - dotnet publish src/Worker -c Release -o ./publish/worker
+
+  login:
+    desc: Log podman into Artifact Registry via gcloud token
+    cmds:
+      - gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin {{.REGISTRY | splitList "/" | first}}
+
+  images:
+    desc: Build all three linux/amd64 images (host-publishes .NET first)
+    deps: [publish]
+    cmds:
+      - podman build --platform linux/amd64 -t {{.REGISTRY}}/api:{{.TAG}} -f src/Api/Dockerfile .
+      - podman build --platform linux/amd64 -t {{.REGISTRY}}/worker:{{.TAG}} -f src/Worker/Dockerfile .
+      - podman build --platform linux/amd64 -t {{.REGISTRY}}/web:{{.TAG}} -f src/Web/Dockerfile src/Web
+
   push:
-    desc: Tag local images and push to Artifact Registry (override REGISTRY)
+    desc: Push the built images to Artifact Registry
     cmds:
       - for: [api, worker, web]
-        cmd: |
-          podman tag otel-poc/{{.ITEM}}:{{.TAG}} {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
-          podman push {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
+        cmd: podman push {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
+
+  build:
+    desc: Publish + build all images (no push)
+    deps: [images]
+
   creds:gke:
-    desc: Point kubeconfig at an existing GKE cluster (override CLUSTER/REGION/PROJECT)
-    vars:
-      CLUSTER: '{{.CLUSTER | default "otel-poc"}}'
-      REGION: '{{.REGION | default "us-central1"}}'
-      PROJECT: '{{.PROJECT | default "focal-fossa-dev"}}'
+    desc: Point kubeconfig at the GKE cluster (override CLUSTER/REGION/PROJECT)
     cmds:
       - gcloud container clusters get-credentials {{.CLUSTER}} --region {{.REGION}} --project {{.PROJECT}}
+
+  apply:foundation:
+    desc: Apply the GCP foundation (AR, GSA/WIF, GSM, Pub/Sub, Firestore, Cloud SQL, Memorystore)
+    dir: infra/live/foundation
+    cmds: ["terragrunt apply -auto-approve --non-interactive"]
+
+  apply:autopilot:
+    desc: Create the Autopilot cluster (optional — skip if using an existing cluster)
+    dir: infra/live/autopilot
+    cmds: ["terragrunt apply -auto-approve --non-interactive"]
+
   install:
     desc: Install one backend stack into its namespace (PROVIDER=google|dash0|coralogix)
     vars:
       PROVIDER: '{{.PROVIDER | default "google"}}'
     cmds:
-      - helm upgrade --install otel-poc-{{.PROVIDER}} ./chart -f chart/values-{{.PROVIDER}}.yaml --set image.tag={{.TAG}} -n otel-poc-{{.PROVIDER}} --create-namespace
+      - >-
+        helm upgrade --install otel-poc-{{.PROVIDER}} ./chart
+        -f chart/values-{{.PROVIDER}}.yaml
+        --set image.tag={{.TAG}}
+        --set components.api.cloudsql.connectionName={{.CLOUDSQL_CONN}}
+        --set components.api.redis.host={{.REDIS_HOST}}
+        -n otel-poc-{{.PROVIDER}} --create-namespace
+
+  ship:
+    desc: Full path — login, build+push amd64 images, deploy one backend (PROVIDER=google)
+    vars:
+      PROVIDER: '{{.PROVIDER | default "google"}}'
+    cmds:
+      - task: login
+      - task: images
+      - task: push
+      - task: install
+        vars: { PROVIDER: "{{.PROVIDER}}" }
