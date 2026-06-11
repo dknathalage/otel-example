@@ -50,10 +50,12 @@ data:
             # Next.js framework render internals — noise inside an API-route trace.
             - 'name == "resolve page components"'
             - 'name == "start response"'
-            # The OTLP-export proxy route (browser shipping its own spans) — telemetry
-            # about telemetry; not part of any business trace.
-            - 'name == "POST /api/otlp/v1/traces"'
-            - 'IsString(attributes["url.path"]) and attributes["url.path"] == "/api/otlp/v1/traces"'
+            # The OTLP-export proxy (browser shipping its own spans) — telemetry about
+            # telemetry. @vercel/otel names these "executing api route ... /api/otlp/..."
+            # and the forward hop "fetch POST http://collector:4318/...", so match broadly.
+            - 'IsMatch(name, "/api/otlp/v1/traces")'
+            - 'IsString(attributes["url.path"]) and IsMatch(attributes["url.path"], "/api/otlp")'
+            - 'IsMatch(name, "collector:4318")'
         logs:
           log_record:
             - 'IsString(attributes["url.path"]) and attributes["url.path"] == "/healthz"'

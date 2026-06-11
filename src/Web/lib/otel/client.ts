@@ -12,9 +12,7 @@ import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_NAMESPACE,
 } from '@opentelemetry/semantic-conventions';
-import { DocumentLoadInstrumentation } from '@opentelemetry/instrumentation-document-load';
 import { FetchInstrumentation } from '@opentelemetry/instrumentation-fetch';
-import { UserInteractionInstrumentation } from '@opentelemetry/instrumentation-user-interaction';
 
 let initialized = false;
 
@@ -46,20 +44,19 @@ export function initBrowserOtel(): void {
 
   provider.register({ contextManager: new ZoneContextManager() });
 
+  // ONLY fetch instrumentation: it captures the order POST as the browser-root
+  // span that connects to the API/worker chain. DocumentLoad (page-load asset
+  // resourceFetch spans) and UserInteraction are deliberately omitted — they're
+  // page-load RUM noise, not part of the browser→data order trace.
   registerInstrumentations({
     instrumentations: [
-      new DocumentLoadInstrumentation(),
-      // Browser fetches (orders + OTLP export) are now same-origin via the
-      // Next.js server proxies, so traceparent propagation is automatic. The
-      // propagateTraceHeaderCorsUrls allow-list is harmless and left in place.
       new FetchInstrumentation({
         propagateTraceHeaderCorsUrls: [/.*/],
         clearTimingResources: true,
-        // Don't trace the span-export POSTs to the OTLP proxy — that's
-        // telemetry about telemetry and would clutter the trace list.
+        // Don't trace the span-export POSTs to the OTLP proxy — telemetry about
+        // telemetry.
         ignoreUrls: [/\/api\/otlp/],
       }),
-      new UserInteractionInstrumentation(),
     ],
   });
 }
