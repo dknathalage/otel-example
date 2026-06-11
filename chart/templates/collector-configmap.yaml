@@ -27,8 +27,10 @@ data:
               allowed_headers: ["*"]
     processors:
       batch: {}
-      # Drop Kubernetes health-check probe traffic so it is neither traced nor logged:
-      # liveness/readiness probes carry a "kube-probe/<ver>" user agent; health logs hit /healthz.
+      # Drop transport/health noise so traces show only the business path:
+      #  - k8s liveness/readiness probes ("kube-probe" UA) and /healthz
+      #  - CORS preflight (OPTIONS) — browser permission handshake, not the operation
+      #  - Pub/Sub subscriber housekeeping RPCs (StreamingPull lease, ModifyAckDeadline, Acknowledge)
       filter/health:
         error_mode: ignore
         traces:
@@ -36,6 +38,9 @@ data:
             - 'IsString(attributes["user_agent.original"]) and IsMatch(attributes["user_agent.original"], "^kube-probe")'
             - 'IsString(attributes["url.path"]) and attributes["url.path"] == "/healthz"'
             - 'name == "GET /healthz"'
+            - 'name == "OPTIONS"'
+            - 'IsString(attributes["http.request.method"]) and attributes["http.request.method"] == "OPTIONS"'
+            - 'IsMatch(name, "^google\\.pubsub\\.v1\\.Subscriber/(Acknowledge|ModifyAckDeadline|StreamingPull)$")'
         logs:
           log_record:
             - 'IsString(attributes["url.path"]) and attributes["url.path"] == "/healthz"'

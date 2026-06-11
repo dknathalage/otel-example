@@ -31,11 +31,10 @@ export function initBrowserOtel(): void {
   }
   initialized = true;
 
-  const url = process.env.NEXT_PUBLIC_OTLP_HTTP_URL; // e.g. https://otel.local/v1/traces
-  if (!url) {
-    // No collector endpoint configured; skip silently so the app still runs.
-    return;
-  }
+  // Default to the same-origin Next.js OTLP proxy (app/api/otlp/v1/traces),
+  // which forwards to the private in-cluster collector. Same-origin means no
+  // CORS and automatic traceparent propagation.
+  const url = process.env.NEXT_PUBLIC_OTLP_HTTP_URL || '/api/otlp/v1/traces';
 
   const provider = new WebTracerProvider({
     resource: resourceFromAttributes({
@@ -50,10 +49,9 @@ export function initBrowserOtel(): void {
   registerInstrumentations({
     instrumentations: [
       new DocumentLoadInstrumentation(),
-      // Propagate W3C traceparent onto the cross-origin fetch to the API so the
-      // browser span and the API/worker spans join ONE trace. Without
-      // propagateTraceHeaderCorsUrls the header is dropped on cross-origin calls.
-      // The API allows the header via CORS (AllowAnyHeader for the web origin).
+      // Browser fetches (orders + OTLP export) are now same-origin via the
+      // Next.js server proxies, so traceparent propagation is automatic. The
+      // propagateTraceHeaderCorsUrls allow-list is harmless and left in place.
       new FetchInstrumentation({
         propagateTraceHeaderCorsUrls: [/.*/],
         clearTimingResources: true,

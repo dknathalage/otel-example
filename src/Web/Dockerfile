@@ -6,10 +6,9 @@ RUN npm ci
 COPY . .
 # NEXT_PUBLIC_* are inlined into the client bundle at build time, so they MUST be
 # present here — setting them as runtime Deployment env does nothing for the browser.
-# POC is port-forward-only, so they point at the forwarded localhost addresses.
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_OTLP_HTTP_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# The browser now exports traces same-origin via the Next.js OTLP proxy
+# (app/api/otlp/v1/traces), so this defaults to that relative path.
+ARG NEXT_PUBLIC_OTLP_HTTP_URL=/api/otlp/v1/traces
 ENV NEXT_PUBLIC_OTLP_HTTP_URL=$NEXT_PUBLIC_OTLP_HTTP_URL
 RUN npm run build
 
