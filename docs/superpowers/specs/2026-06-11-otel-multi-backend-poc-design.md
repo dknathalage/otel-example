@@ -226,7 +226,7 @@ backends:
   dash0:
     enabled: true
     endpoint: https://ingress.<region>.dash0.com
-    dataset: production
+    dataset: otel-poc
     tokenSecret: dash0-token        # GSM secret name
   coralogix:
     enabled: true
