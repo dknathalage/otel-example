@@ -17,7 +17,7 @@ version: "3"
 vars:
   TAG: { sh: git rev-parse --short HEAD }
   APP_NAME: { sh: 'echo "${APP_NAME:-otel-poc}"' }
-  PROJECT: { sh: 'echo "${GCP_PROJECT:?GCP_PROJECT must be set, e.g. export GCP_PROJECT=my-project}"' }
+  PROJECT: { sh: 'echo "${GCP_PROJECT:-}"' }   # required for GCP tasks; enforced per-task (see &reqproj)
   REGION: { sh: 'echo "${GCP_REGION:-us-central1}"' }
   REGISTRY: '{{.REGION}}-docker.pkg.dev/{{.PROJECT}}/{{.APP_NAME}}'
   CLUSTER: '{{.CLUSTER | default .APP_NAME}}'
@@ -25,11 +25,15 @@ vars:
 tasks:
   login:
     desc: Log docker into Artifact Registry via gcloud token
+    preconditions: &reqproj
+      - sh: '[ -n "{{.PROJECT}}" ]'
+        msg: "GCP_PROJECT must be set, e.g. export GCP_PROJECT=my-project"
     cmds:
       - gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin {{.REGISTRY | splitList "/" | first}}
 
   images:
     desc: Build all three linux/amd64 images (multi-stage, publishes .NET inside the image)
+    preconditions: *reqproj
     cmds:
       - docker build --platform linux/amd64 -t {{.REGISTRY}}/api:{{.TAG}} -f src/Api/Dockerfile .
       - docker build --platform linux/amd64 -t {{.REGISTRY}}/worker:{{.TAG}} -f src/Worker/Dockerfile .
@@ -37,6 +41,7 @@ tasks:
 
   push:
     desc: Push the built images to Artifact Registry
+    preconditions: *reqproj
     cmds:
       - for: [api, worker, web]
         cmd: docker push {{.REGISTRY}}/{{.ITEM}}:{{.TAG}}
@@ -47,6 +52,7 @@ tasks:
 
   creds:gke:
     desc: Point kubeconfig at the GKE cluster (override CLUSTER/REGION/PROJECT)
+    preconditions: *reqproj
     cmds:
       - gcloud container clusters get-credentials {{.CLUSTER}} --region {{.REGION}} --project {{.PROJECT}}
 
@@ -62,6 +68,7 @@ tasks:
 
   install:
     desc: Install one backend stack into its namespace (PROVIDER=google|dash0|coralogix)
+    preconditions: *reqproj
     vars:
       PROVIDER: '{{.PROVIDER | default "google"}}'
       CLOUDSQL_CONN: { sh: 'cd infra/live/foundation && terragrunt output -raw cloudsql_connection_name' }
