@@ -1,10 +1,8 @@
-# build (context = repo root)
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
-COPY . .
-RUN dotnet publish src/Api -c Release -o /app
-
-# runtime + OTel auto-instrumentation
+# Runtime-only image. The app is published on the HOST (native, portable IL) into
+# ./publish/api before building, so this image never runs `dotnet` during build —
+# avoiding the qemu/.NET MSBuild crash when cross-building linux/amd64 on arm64.
+#   host: dotnet publish src/Api -c Release -o ./publish/api
+#   build: podman build --platform linux/amd64 -f src/Api/Dockerfile .   (context = repo root)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 RUN apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*
@@ -18,5 +16,5 @@ ENV CORECLR_ENABLE_PROFILING=1 \
     DOTNET_SHARED_STORE=/otel-dotnet-auto/store \
     DOTNET_STARTUP_HOOKS=/otel-dotnet-auto/net/OpenTelemetry.AutoInstrumentation.StartupHook.dll \
     OTEL_SERVICE_NAME=api
-COPY --from=build /app .
+COPY publish/api .
 ENTRYPOINT ["dotnet", "Api.dll"]
