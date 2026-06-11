@@ -38,8 +38,8 @@ spec:
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
             - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf" }
             - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-stack.resourceAttributes" . }}" }
-            - { name: NEXT_PUBLIC_API_URL, value: "{{ $c.apiUrl }}" }
-            - { name: NEXT_PUBLIC_OTLP_HTTP_URL, value: "{{ $c.otlpHttpUrl }}" }
+            # NEXT_PUBLIC_* are baked into the client bundle at image build time
+            # (see src/Web/Dockerfile + Taskfile images), not injected here.
           {{- with $c.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

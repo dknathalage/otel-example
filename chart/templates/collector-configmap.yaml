@@ -103,4 +103,3 @@ data:
           receivers: [otlp]
           processors: [filter/health, batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
           exporters: [{{ if $dbg }}debug, {{ end }}{{ if $gcp }}googlecloud{{ else }}{{ $exp }}{{ end }}]
-          exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]
