@@ -45,12 +45,8 @@ variable "create_firestore" {
   default     = true
 }
 
-variable "cloudsql_password" {
-  type        = string
-  description = "Password for the Cloud SQL 'otel' app user (POC default; override for anything real)."
-  sensitive   = true
-  default     = "otelpoc-dev-pw"
-}
+# The Cloud SQL app-user password is generated (random_password.cloudsql) — never
+# a hardcoded default. Read it from the `cloudsql_password` output (sensitive).
 
 # Backend credentials written into GSM. Supply via TF_VAR_dash0_token / TF_VAR_coralogix_key
 # (or a gitignored/sops tfvars). Empty default => the secret version is skipped, so the

@@ -72,6 +72,7 @@ tasks:
     vars:
       PROVIDER: '{{.PROVIDER | default "google"}}'
       CLOUDSQL_CONN: { sh: 'cd infra/live/foundation && terragrunt output -raw cloudsql_connection_name' }
+      CLOUDSQL_PW: { sh: 'cd infra/live/foundation && terragrunt output -raw cloudsql_password' }
       REDIS_HOST: { sh: 'cd infra/live/foundation && terragrunt output -raw redis_host' }
     cmds:
       - >-
@@ -83,6 +84,7 @@ tasks:
         --set image.registry={{.REGISTRY}}
         --set image.tag={{.TAG}}
         --set components.api.cloudsql.connectionName={{.CLOUDSQL_CONN}}
+        --set components.api.cloudsql.password={{.CLOUDSQL_PW}}
         --set components.api.redis.host={{.REDIS_HOST}}
         -n {{.APP_NAME}}-{{.PROVIDER}} --create-namespace
 

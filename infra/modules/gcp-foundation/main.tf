@@ -158,11 +158,19 @@ resource "google_sql_database_instance" "orders" {
   depends_on = [google_project_service.apis]
 }
 
+# Generated DB password — never hardcoded/committed. Consume via the
+# `cloudsql_password` output (sensitive). special=false keeps it safe in a
+# Host=...;Password=... connection string without escaping.
+resource "random_password" "cloudsql" {
+  length  = 24
+  special = false
+}
+
 # DB user the apps connect as (via the Cloud SQL Auth Proxy).
 resource "google_sql_user" "app" {
   name     = "otel"
   instance = google_sql_database_instance.orders.name
-  password = var.cloudsql_password
+  password = random_password.cloudsql.result
 }
 
 # Per-release logical database: orders_<release>.

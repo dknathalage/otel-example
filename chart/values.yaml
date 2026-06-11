@@ -41,7 +41,7 @@ components:
     image: { repo: api }
     replicas: 1
     resources: {}
-    cloudsql: { connectionName: "", user: otel, password: "otelpoc-dev-pw" }
+    cloudsql: { connectionName: "", user: otel, password: "" }  # password set at install (Tofu cloudsql_password output)
     redis:    { host: "", port: 6379 }
     pubsub:   { enabled: true }
   worker:
@@ -59,8 +59,9 @@ components:
 
 # ── Browser CORS ──
 # No Ingress: services are reached via `kubectl port-forward` only (not publicly exposed).
-# webOrigin is still used for the collector's OTLP/HTTP CORS allow-list.
-webOrigin: "https://web.example.com"
+# webOrigin is the collector's OTLP/HTTP CORS allow-list. The browser loads the web app
+# at the forwarded localhost:3000, so that is the Origin it sends when exporting traces.
+webOrigin: "http://localhost:3000"
 
 # ── Workload Identity ──
 # serviceAccountName defaults to appName and MUST equal the tofu ksa_name the WIF binding

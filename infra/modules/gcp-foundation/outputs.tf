@@ -27,3 +27,9 @@ output "redis_host" {
 output "redis_port" {
   value = google_redis_instance.cache.port
 }
+
+output "cloudsql_password" {
+  description = "Generated Cloud SQL app-user password (pass to Helm via --set at install)."
+  value       = random_password.cloudsql.result
+  sensitive   = true
+}
