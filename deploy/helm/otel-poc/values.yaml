@@ -7,10 +7,19 @@ env: local
 # GCP project id. Rendered into the collector config (resource/gcp value + GSM URIs).
 gcpProject: ""
 
-# Name of a Secret (key: adc.json) holding Application Default Credentials for the
-# collector's googleclientauth extension. Used on kind where no metadata server
-# exists. Created out-of-band by the operator; the chart only mounts it. Empty = off.
-gcpAdcSecretName: ""
+# Managed Cloud SQL Postgres. connectionName is set at deploy time (--set) from the
+# Tofu output cloudsql_connection_name (project:region:instance). The API reaches
+# Postgres through the cloud-sql-proxy sidecar on 127.0.0.1:5432.
+cloudsql:
+  connectionName: ""
+  user: otel
+  password: "otelpoc-dev-pw"
+
+# Managed Memorystore Redis. host is set at deploy time (--set) from the Tofu output
+# redis_host. Only the API uses Redis.
+redis:
+  host: ""
+  port: 6379
 
 # App container images. Match the local podman image names: otel-poc/api:dev etc.
 image:
@@ -37,10 +46,6 @@ providers:
 
 # Workload Identity: GCP service account email bound to the KSA (only used when env=gke).
 gcpServiceAccount: ""
-
-# In-namespace dependency emulators (Postgres/Redis/Pub-Sub/Firestore). Local only.
-deps:
-  enabled: true
 
 # Browser origin allowed by the collector OTLP/http CORS config (never "*").
 webOrigin: "http://localhost:3000"

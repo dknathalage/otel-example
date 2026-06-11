@@ -1,15 +1,35 @@
-# GKE overrides. Managed cloud deps (Cloud SQL / Memorystore / Pub-Sub / Firestore),
-# so the in-namespace emulators are disabled.
+# GKE overrides. All data is managed cloud (Cloud SQL / Memorystore / Pub-Sub / Firestore);
+# there are no in-cluster deps. Auth on GKE is Workload Identity (no ADC secret).
 env: gke
-deps:
-  enabled: false
-# Override registry to the Artifact Registry path at install time, e.g.
-#   --set image.registry=us-docker.pkg.dev/<project>/<repo>
+gcpProject: focal-fossa-dev
+
+# Artifact Registry path for the built images. Override image.tag at install time.
 image:
-  registry: "us-docker.pkg.dev/REPLACE_ME/otel-poc"
+  registry: "us-central1-docker.pkg.dev/focal-fossa-dev/otel-poc"
   tag: "dev"
-# WIF: GCP service account email bound to the KSA. Override at install time.
-gcpServiceAccount: "otel-poc@REPLACE_ME.iam.gserviceaccount.com"
+
+# WIF: GCP service account email bound to the KSA.
+gcpServiceAccount: "otel-poc@focal-fossa-dev.iam.gserviceaccount.com"
+
+collector:
+  debug: true
+
+# connectionName and redis.host are filled at deploy time via --set from Tofu outputs.
+cloudsql:
+  connectionName: ""
+  user: otel
+  password: "otelpoc-dev-pw"
+redis:
+  host: ""
+  port: 6379
+
+providers:
+  dash0:
+    region: us-west-2
+    dataset: otel-poc
+  coralogix:
+    domain: eu2.coralogix.com
+
 webOrigin: "https://web.example.com"
 ingress:
   enabled: true

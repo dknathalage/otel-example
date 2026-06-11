@@ -29,7 +29,3 @@ spec:
             - { name: PubSub__SubscriptionId, value: "{{ include "otel-poc.subscription" . }}" }
             - { name: Firestore__ProjectId, value: "{{ .Values.gcpProject }}" }
             - { name: Firestore__CollectionPrefix, value: "{{ include "otel-poc.prefix" . }}" }
-            {{- if .Values.deps.enabled }}
-            - { name: PUBSUB_EMULATOR_HOST, value: "pubsub-emulator:8085" }
-            - { name: FIRESTORE_EMULATOR_HOST, value: "firestore-emulator:8080" }
-            {{- end }}

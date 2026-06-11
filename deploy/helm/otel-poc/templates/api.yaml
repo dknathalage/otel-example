@@ -27,16 +27,35 @@ spec:
             - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-poc.resourceAttributes" . }}" }
             - { name: ASPNETCORE_URLS, value: "http://0.0.0.0:8080" }
             - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
-            - { name: ConnectionStrings__Orders, value: "Host=postgres;Port=5432;Database={{ include "otel-poc.pgdb" . }};Username=postgres;Password=postgres" }
-            - { name: Redis__ConnectionString, value: "redis:6379" }
+            # Cloud SQL: app talks to the Auth Proxy sidecar on 127.0.0.1:5432.
+            - name: CLOUDSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql
+                  key: password
+            - name: ConnectionStrings__Orders
+              value: "Host=127.0.0.1;Port=5432;Database={{ include "otel-poc.pgdb" . }};Username={{ .Values.cloudsql.user }};Password=$(CLOUDSQL_PASSWORD)"
+            - { name: Redis__ConnectionString, value: "{{ .Values.redis.host }}:{{ .Values.redis.port }}" }
             - { name: Redis__KeyPrefix, value: "{{ include "otel-poc.prefix" . }}" }
             - { name: PubSub__ProjectId, value: "{{ .Values.gcpProject }}" }
             - { name: PubSub__TopicId, value: "{{ include "otel-poc.topic" . }}" }
             - { name: PubSub__SubscriptionId, value: "{{ include "otel-poc.subscription" . }}" }
-            {{- if .Values.deps.enabled }}
-            - { name: PUBSUB_EMULATOR_HOST, value: "pubsub-emulator:8085" }
-            - { name: FIRESTORE_EMULATOR_HOST, value: "firestore-emulator:8080" }
-            {{- end }}
+        # Cloud SQL Auth Proxy: authenticates via Workload Identity, exposes Postgres on localhost.
+        - name: cloud-sql-proxy
+          image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest"
+          args:
+            - "--structured-logs"
+            - "--port=5432"
+            - "$(CLOUDSQL_CONNECTION_NAME)"
+          env:
+            - { name: CLOUDSQL_CONNECTION_NAME, value: "{{ .Values.cloudsql.connectionName }}" }
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
 ---
 apiVersion: v1
 kind: Service

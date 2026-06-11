@@ -37,3 +37,10 @@ variable "create_firestore" {
   description = "Create the (default) Firestore database. Set false if the project already has one."
   default     = true
 }
+
+variable "cloudsql_password" {
+  type        = string
+  description = "Password for the Cloud SQL 'otel' app user (POC default; override for anything real)."
+  sensitive   = true
+  default     = "otelpoc-dev-pw"
+}

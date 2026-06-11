@@ -10,6 +10,9 @@ locals {
     "monitoring.googleapis.com",
     "logging.googleapis.com",
     "telemetry.googleapis.com",
+    "sqladmin.googleapis.com",
+    "redis.googleapis.com",
+    "servicenetworking.googleapis.com",
   ]
 }
 
@@ -48,6 +51,7 @@ locals {
     "roles/secretmanager.secretAccessor",
     "roles/pubsub.editor",
     "roles/datastore.user",
+    "roles/cloudsql.client",
   ]
 }
 
@@ -106,4 +110,55 @@ resource "google_firestore_database" "default" {
   location_id = var.region
   type        = "FIRESTORE_NATIVE"
   depends_on  = [google_project_service.apis]
+}
+
+# --- Cloud SQL Postgres (cheapest: db-f1-micro shared-core / ENTERPRISE / zonal / HDD / no backups) ---
+resource "google_sql_database_instance" "orders" {
+  name                = "otel-poc"
+  database_version    = "POSTGRES_16"
+  region              = var.region
+  deletion_protection = false
+
+  settings {
+    tier              = "db-f1-micro"
+    edition           = "ENTERPRISE"
+    availability_type = "ZONAL"
+    disk_type         = "PD_HDD"
+    disk_size         = 10
+    disk_autoresize   = false
+
+    backup_configuration {
+      enabled = false
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+# DB user the apps connect as (via the Cloud SQL Auth Proxy).
+resource "google_sql_user" "app" {
+  name     = "otel"
+  instance = google_sql_database_instance.orders.name
+  password = var.cloudsql_password
+}
+
+# Per-release logical database: orders_<release>.
+resource "google_sql_database" "orders" {
+  for_each = toset(var.releases)
+  name     = "orders_${each.value}"
+  instance = google_sql_database_instance.orders.name
+}
+
+# --- Memorystore Redis (cheapest: BASIC tier, 1 GB, direct peering on the default VPC) ---
+resource "google_redis_instance" "cache" {
+  name               = "otel-poc"
+  display_name       = "otel-poc"
+  tier               = "BASIC"
+  memory_size_gb     = 1
+  region             = var.region
+  redis_version      = "REDIS_7_2"
+  connect_mode       = "DIRECT_PEERING"
+  authorized_network = "default"
+
+  depends_on = [google_project_service.apis]
 }
