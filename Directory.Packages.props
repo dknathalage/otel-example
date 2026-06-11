@@ -1,4 +1,7 @@
 <Project>
+  <PropertyGroup>
+    <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
+  </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Google.Cloud.SecretManager.V1" Version="2.*" />
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="3.*" />

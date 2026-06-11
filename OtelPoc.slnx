@@ -1,2 +1,5 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Core.Telemetry/Core.Telemetry.csproj" />
+  </Folder>
 </Solution>
