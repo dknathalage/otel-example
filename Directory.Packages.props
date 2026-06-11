@@ -16,5 +16,6 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.*" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.*" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.*" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.*" />
   </ItemGroup>
 </Project>
