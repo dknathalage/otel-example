@@ -55,6 +55,9 @@ export function initBrowserOtel(): void {
       new FetchInstrumentation({
         propagateTraceHeaderCorsUrls: [/.*/],
         clearTimingResources: true,
+        // Don't trace the span-export POSTs to the OTLP proxy — that's
+        // telemetry about telemetry and would clutter the trace list.
+        ignoreUrls: [/\/api\/otlp/],
       }),
       new UserInteractionInstrumentation(),
     ],
