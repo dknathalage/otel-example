@@ -41,6 +41,15 @@ data:
             - 'name == "OPTIONS"'
             - 'IsString(attributes["http.request.method"]) and attributes["http.request.method"] == "OPTIONS"'
             - 'IsMatch(name, "^google\\.pubsub\\.v1\\.Subscriber/(Acknowledge|ModifyAckDeadline|StreamingPull)$")'
+            # Bare "GET"/"POST" = GCP SDK transport (auth/metadata token fetches + the raw
+            # HTTP under the gRPC publish/commit). The meaningful calls keep descriptive
+            # names (POST /orders, orders publish, Firestore/Commit), so these bare ones are
+            # pure transport noise. All are leaf spans → dropping them orphans nothing.
+            - 'name == "GET"'
+            - 'name == "POST"'
+            # Next.js framework render internals — noise inside an API-route trace.
+            - 'name == "resolve page components"'
+            - 'name == "start response"'
         logs:
           log_record:
             - 'IsString(attributes["url.path"]) and attributes["url.path"] == "/healthz"'
