@@ -27,6 +27,19 @@ data:
               allowed_headers: ["*"]
     processors:
       batch: {}
+      # Drop Kubernetes health-check probe traffic so it is neither traced nor logged:
+      # liveness/readiness probes carry a "kube-probe/<ver>" user agent; health logs hit /healthz.
+      filter/health:
+        error_mode: ignore
+        traces:
+          span:
+            - 'IsString(attributes["user_agent.original"]) and IsMatch(attributes["user_agent.original"], "^kube-probe")'
+            - 'IsString(attributes["url.path"]) and attributes["url.path"] == "/healthz"'
+            - 'name == "GET /healthz"'
+        logs:
+          log_record:
+            - 'IsString(attributes["url.path"]) and attributes["url.path"] == "/healthz"'
+            - 'IsString(body) and IsMatch(body, "/healthz")'
       {{- if $gcp }}
       resource/gcp:
         attributes:
@@ -73,7 +86,7 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
+          processors: [filter/health, batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
           exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]
         metrics:
           receivers: [otlp]
@@ -81,5 +94,5 @@ data:
           exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]
         logs:
           receivers: [otlp]
-          processors: [batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
+          processors: [filter/health, batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
           exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]
