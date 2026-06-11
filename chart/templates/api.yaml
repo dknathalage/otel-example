@@ -44,6 +44,8 @@ spec:
             # manual spans (orders publish/process, firestore upsert) and the Pub/Sub
             # traceparent linkage participates in the trace.
             - { name: OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES, value: "OtelPoc" }
+            # Export the rendered log message (not the raw "{placeholder}" template) as the body.
+            - { name: OTEL_DOTNET_AUTO_LOGS_INCLUDE_FORMATTED_MESSAGE, value: "true" }
             - { name: ASPNETCORE_URLS, value: "http://0.0.0.0:8080" }
             - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
             # Cloud SQL: app talks to the Auth Proxy sidecar on 127.0.0.1:5432.

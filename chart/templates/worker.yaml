@@ -30,6 +30,8 @@ spec:
             # Register Core.Telemetry's ActivitySource so manual spans + the Pub/Sub
             # traceparent linkage are exported by the auto-instr agent.
             - { name: OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES, value: "OtelPoc" }
+            # Export the rendered log message (not the raw "{placeholder}" template) as the body.
+            - { name: OTEL_DOTNET_AUTO_LOGS_INCLUDE_FORMATTED_MESSAGE, value: "true" }
             - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
             - { name: PubSub__ProjectId, value: "{{ .Values.gcpProject }}" }
             - { name: PubSub__TopicId, value: "{{ include "otel-stack.topic" . }}" }
