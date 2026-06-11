@@ -47,9 +47,11 @@ data:
             # pure transport noise. All are leaf spans → dropping them orphans nothing.
             - 'name == "GET"'
             - 'name == "POST"'
-            # Next.js framework render internals — noise inside an API-route trace.
+            # Next.js framework render internals + the page-serve span — page-load
+            # noise, not part of the order flow (browser page-load RUM is also disabled).
             - 'name == "resolve page components"'
             - 'name == "start response"'
+            - 'name == "GET /"'
             # The OTLP-export proxy (browser shipping its own spans) — telemetry about
             # telemetry. @vercel/otel names these "executing api route ... /api/otlp/..."
             # and the forward hop "fetch POST http://collector:4318/...", so match broadly.
