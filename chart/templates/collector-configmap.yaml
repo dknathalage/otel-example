@@ -60,6 +60,13 @@ data:
         encoding: proto
         auth:
           authenticator: googleclientauth
+      # Logs go through the googlecloud exporter (not the OTLP telemetry endpoint):
+      # it writes to the Cloud Logging API and sets the entry's trace/spanId fields
+      # from the OTLP trace context, so logs correlate with traces in the UI.
+      googlecloud:
+        project: {{ .Values.gcpProject }}
+        log:
+          default_log_name: {{ .Values.appName | quote }}
       {{- else if eq $be.type "otlphttp" }}
       otlphttp/be:
         endpoint: {{ $be.endpoint }}
@@ -95,4 +102,5 @@ data:
         logs:
           receivers: [otlp]
           processors: [filter/health, batch{{ if $gcp }}, resource/gcp, resourcedetection/gcp{{ end }}]
+          exporters: [{{ if $dbg }}debug, {{ end }}{{ if $gcp }}googlecloud{{ else }}{{ $exp }}{{ end }}]
           exporters: [{{ if $dbg }}debug, {{ end }}{{ $exp }}]
