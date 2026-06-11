@@ -64,7 +64,9 @@ region  = get_env("GCP_REGION", "us-central1")
 ```
 
 `get_env("GCP_PROJECT")` with no default makes terragrunt fail fast if the env
-var is unset. `cluster_name`, `releases`, and `create_firestore` stay as literal
+var is unset. (Implementation: confirm `infra/live/autopilot/terragrunt.hcl` has
+the same literal `project`/`region` at lines 10–11 before applying the identical
+edit — pattern is expected but verify.) `cluster_name`, `releases`, and `create_firestore` stay as literal
 inputs (sane shared defaults, not author-specific). Module `variables.tf` files
 are unchanged — `project` is already a required variable; `region` keeps its
 `us-central1` default (a real region, not author-specific).
@@ -87,6 +89,16 @@ are unchanged — `project` is already a required variable; `region` keeps its
   — no manual entry, no stale IP. (These `sh` lookups run when the Taskfile is
   parsed; they require the foundation to be applied first, which the documented
   flow guarantees. If unapplied, the task fails with a clear terragrunt error.)
+
+  **Cold-clone footgun:** because the lookups are parse-time, *any* task that
+  references these vars fails before the foundation exists — including
+  `task build`/`task images` (they use `REGISTRY`), which a reader may expect to
+  "just build". Mitigation: keep `REGISTRY` derived from `GCP_PROJECT`/`GCP_REGION`
+  env (`<region>-docker.pkg.dev/<project>/otel-poc`) rather than from
+  `terragrunt output` — registry path is deterministic from project+region, so it
+  needs no applied state. Only `CLOUDSQL_CONN` and `REDIS_HOST` (true runtime
+  outputs) come from `terragrunt output`, and only `install`/`ship` reference
+  them. Document per-task what each requires.
 
 ### 3. Helm chart — placeholders + derived GSA
 
