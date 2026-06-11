@@ -28,6 +28,10 @@ spec:
           env:
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "{{ include "otel-stack.otlpEndpoint" . }}" }
             - { name: OTEL_RESOURCE_ATTRIBUTES, value: "{{ include "otel-stack.resourceAttributes" . }}" }
+            # Register the Core.Telemetry ActivitySource so the auto-instr agent exports our
+            # manual spans (orders publish/process, firestore upsert) and the Pub/Sub
+            # traceparent linkage participates in the trace.
+            - { name: OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES, value: "OtelPoc" }
             - { name: ASPNETCORE_URLS, value: "http://0.0.0.0:8080" }
             - { name: Gcp__ProjectId, value: "{{ .Values.gcpProject }}" }
             # Cloud SQL: app talks to the Auth Proxy sidecar on 127.0.0.1:5432.
