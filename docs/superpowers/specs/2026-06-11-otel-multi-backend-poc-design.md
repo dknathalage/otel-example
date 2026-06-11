@@ -88,7 +88,7 @@ Distributed trace spanning browser → HTTP → cache → SQL → messaging → 
 
 ## Shared `core.*` packages
 
-A set of small, single-purpose **.NET class libraries** under `dotnet/src/Core/`
+A set of small, single-purpose **.NET class libraries** under `src/Core.*`
 (see Source layout), referenced by both `api` and `worker`. Each has one clear purpose, a narrow
 public interface, and is independently testable. Business code depends on these,
 never on the SDKs directly.
@@ -114,58 +114,52 @@ Web touches no Pub/Sub/Firestore/Redis directly — it calls the API.
 
 ## Source layout
 
-Monorepo. .NET solution (api + worker + core libs) under `dotnet/`; Next.js under
-`apps/web/`; infra/helm/load/docs alongside.
+Monorepo. **All apps flat under `src/`** — the Next.js app and the .NET projects
+(api, worker, core libs) side by side. The .NET solution lives at the root.
 
 ```
 otel-example/
-├─ apps/
-│  └─ web/                          # Next.js (TypeScript, app router)
-│     ├─ package.json
-│     ├─ next.config.js
-│     ├─ instrumentation.ts         # @vercel/otel registerOTel() — server
-│     ├─ Dockerfile
-│     ├─ app/
-│     │  ├─ layout.tsx
-│     │  ├─ page.tsx                # order form
-│     │  └─ providers.tsx           # mounts browser OTel init
-│     └─ lib/
-│        ├─ otel/client.ts          # browser Web SDK bootstrap (OTLP/http)
-│        ├─ api.ts                  # typed calls to .NET API
-│        └─ secrets.ts              # server GSM read (mirrors Core.Secrets)
-│
-├─ dotnet/
-│  ├─ OtelPoc.sln
-│  ├─ Directory.Packages.props      # central NuGet versions
-│  ├─ src/
-│  │  ├─ Api/
-│  │  │  ├─ Api.csproj
-│  │  │  ├─ Program.cs              # DI: AddCore*(); maps endpoints
-│  │  │  ├─ Endpoints/OrdersEndpoints.cs
-│  │  │  ├─ Models/{Order,CreateOrderRequest}.cs
-│  │  │  ├─ appsettings.json
-│  │  │  └─ Dockerfile              # multi-stage + otel-dotnet-auto-install.sh
-│  │  ├─ Worker/
-│  │  │  ├─ Worker.csproj
-│  │  │  ├─ Program.cs
-│  │  │  ├─ Consumers/OrderConsumer.cs   # Core.PubSub subscribe → Core.Firestore
-│  │  │  ├─ appsettings.json
-│  │  │  └─ Dockerfile
-│  │  └─ Core/
-│  │     ├─ Core.Secrets/      { ISecretProvider, GsmSecretProvider, ServiceCollectionExtensions }
-│  │     ├─ Core.Telemetry/    { Telemetry(ActivitySource), Propagation, ResourceConventions, …Extensions }
-│  │     ├─ Core.Logging/      { LoggingConventions, …Extensions }            # → Core.Telemetry
-│  │     ├─ Core.PubSub/       { IPubSubPublisher, PubSubPublisher,           # → Core.Telemetry
-│  │     │                       IPubSubSubscriber, PubSubSubscriber,
-│  │     │                       TraceContextCarrier, …Extensions }          # inject/extract shim
-│  │     ├─ Core.Firestore/    { IFirestoreStore, FirestoreStore, …Extensions }  # → Core.Telemetry, manual spans
-│  │     ├─ Core.Redis/        { IRedisCache, RedisCache(idempotency), …Extensions }
-│  │     └─ Core.Data/         { OrdersDbContext, OrderEntity, IOrderRepository,
-│  │                             OrderRepository, Migrations/, …Extensions }
-│  └─ tests/
-│     ├─ Core.PubSub.Tests/         # traceparent survives publish→consume
-│     ├─ Core.Firestore.Tests/      # span emission
-│     └─ Pipeline.IntegrationTests/ # end-to-end span tree (testcontainers/emulators)
+├─ OtelPoc.sln                      # references the .NET projects in src/
+├─ Directory.Packages.props         # central NuGet versions
+├─ src/
+│  ├─ Web/                          # Next.js (TypeScript, app router)
+│  │  ├─ package.json
+│  │  ├─ next.config.js
+│  │  ├─ instrumentation.ts         # @vercel/otel registerOTel() — server
+│  │  ├─ Dockerfile
+│  │  ├─ app/
+│  │  │  ├─ layout.tsx
+│  │  │  ├─ page.tsx                # order form
+│  │  │  └─ providers.tsx           # mounts browser OTel init
+│  │  └─ lib/
+│  │     ├─ otel/client.ts          # browser Web SDK bootstrap (OTLP/http)
+│  │     ├─ api.ts                  # typed calls to .NET API
+│  │     └─ secrets.ts              # server GSM read (mirrors Core.Secrets)
+│  │
+│  ├─ Api/
+│  │  ├─ Api.csproj
+│  │  ├─ Program.cs                 # DI: AddCore*(); maps endpoints
+│  │  ├─ Endpoints/OrdersEndpoints.cs
+│  │  ├─ Models/{Order,CreateOrderRequest}.cs
+│  │  ├─ appsettings.json
+│  │  └─ Dockerfile                 # multi-stage + otel-dotnet-auto-install.sh
+│  ├─ Worker/
+│  │  ├─ Worker.csproj
+│  │  ├─ Program.cs
+│  │  ├─ Consumers/OrderConsumer.cs # Core.PubSub subscribe → Core.Firestore
+│  │  ├─ appsettings.json
+│  │  └─ Dockerfile
+│  │
+│  ├─ Core.Secrets/     { ISecretProvider, GsmSecretProvider, ServiceCollectionExtensions }
+│  ├─ Core.Telemetry/   { Telemetry(ActivitySource), Propagation, ResourceConventions, …Extensions }
+│  ├─ Core.Logging/     { LoggingConventions, …Extensions }              # → Core.Telemetry
+│  ├─ Core.PubSub/      { IPubSubPublisher, PubSubPublisher,             # → Core.Telemetry
+│  │                      IPubSubSubscriber, PubSubSubscriber,
+│  │                      TraceContextCarrier, …Extensions }            # inject/extract shim
+│  ├─ Core.Firestore/   { IFirestoreStore, FirestoreStore, …Extensions } # → Core.Telemetry, manual spans
+│  ├─ Core.Redis/       { IRedisCache, RedisCache(idempotency), …Extensions }
+│  └─ Core.Data/        { OrdersDbContext, OrderEntity, IOrderRepository,
+│                         OrderRepository, Migrations/, …Extensions }
 │
 ├─ deploy/helm/otel-poc/
 │  ├─ Chart.yaml
@@ -462,16 +456,17 @@ with a different `provider` value; nothing else changes.
   duration; collector may apply head/probabilistic sampling for load runs —
   document the rate so comparison is fair.
 
-## Testing
+## Validation
 
-- **App units:** pipeline handlers + the `core.pubsub` inject/extract shim
-  (assert `traceparent` survives a publish→consume round-trip) + `core.firestore`
-  span emission.
-- **End-to-end:** an order produces the expected span tree including Pub/Sub
-  publish→consume continuity.
-- **CI smoke:** collector with the `file` exporter (+ `debug`); submit an order,
-  read the file output, assert span names + parent/child links. No live backend
-  credentials in CI; GSM/exporters stubbed.
+No automated test suite (dropped by scope). Validation is operational:
+
+- **Manual end-to-end:** submit an order; confirm the expected span tree appears
+  — browser → API (Postgres/Redis) → Pub/Sub publish→consume continuity →
+  Firestore. The Pub/Sub `traceparent` shim is the part to eyeball: the consume
+  span must be a child/link of the publish span.
+- **Collector debug:** run the collector with the `debug` exporter alongside the
+  real one during bring-up to confirm spans/metrics/logs flow before trusting the
+  backend UI.
 
 ## Open items / future
 
